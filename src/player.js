@@ -79,7 +79,7 @@ export class Player {
         this.energy = Math.min(this.maxEnergy, this.energy + eRegen * this.energyRegenMult);
 
         // 2. Dash Handling
-        if (keys.control && !this.isDashing && this.energy >= CONFIG.PLAYER.DASH_COST) {
+        if (keys.shift && !this.isDashing && this.energy >= CONFIG.PLAYER.DASH_COST) {
             this.startDash();
         }
 

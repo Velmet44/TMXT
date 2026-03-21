@@ -1,10 +1,12 @@
+import { soundManager } from './SoundManager.js';
+
 export const keys = {
     w: false,
     a: false,
     s: false,
     d: false,
     escape: false,
-    control: false,
+    shift: false,
     z: false,
     x: false,
     c: false,
@@ -96,29 +98,54 @@ class Joystick {
 window.addEventListener('keydown', (e) => {
     const key = e.key.toLowerCase();
     
-    // Prevent default browser actions for game controls (e.g., Ctrl+S, Ctrl+W, Space)
-    const blockedKeys = ['w', 'a', 's', 'd', 'z', 'x', 'c', 'v', 'r', 'f', 'g', 's'];
+    // Aggressively prevent default browser actions when Ctrl/Meta is held 
+    // to stop shortcuts like Ctrl+W, Ctrl+S, etc. from firing.
     if (e.ctrlKey || e.metaKey) {
-        if (blockedKeys.includes(key)) {
-            e.preventDefault();
-        }
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
     }
 
     // Always block Space default (scrolling)
     if (key === ' ' || key === 'spacebar') {
         e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
     }
 
     if (key === 'escape') keys.escape = true;
-    else if (key === 'control') keys.control = true;
+    else if (key === 'shift') {
+        if (!keys.shift) soundManager.playSFX('dash');
+        keys.shift = true;
+    }
     else if (key in keys) keys[key] = true;
-}, { capture: true });
+}, { capture: true, passive: false });
 
 window.addEventListener('keyup', (e) => {
     const key = e.key.toLowerCase();
     if (key === 'escape') keys.escape = false;
-    else if (key === 'control') keys.control = false;
+    else if (key === 'shift') keys.shift = false;
     else if (key in keys) keys[key] = false;
+}, { capture: true, passive: false });
+
+// Final defense against Ctrl+W / accidental closing
+window.addEventListener('beforeunload', (e) => {
+    // Only warn if the game has started
+    if (!document.getElementById('main-menu').classList.contains('hidden')) return;
+    
+    e.preventDefault();
+    e.returnValue = 'Are you sure you want to exit the game?';
+    return e.returnValue;
+});
+
+// Disable right-click menu to avoid gameplay interruption
+window.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// Reset keys when window loses focus
+window.addEventListener('blur', () => {
+    for (let k in keys) {
+        if (typeof keys[k] === 'boolean') keys[k] = false;
+    }
 }, { capture: true });
 
 // Mobile Optimization: Fullscreen & Landscape
@@ -200,10 +227,11 @@ if (keys.isMobile) {
     const dashBtn = document.getElementById('btn-dash');
     dashBtn.addEventListener('touchstart', (e) => { 
         e.preventDefault(); 
-        keys.control = true; 
+        if (!keys.shift) soundManager.playSFX('dash');
+        keys.shift = true; 
     }, { passive: false });
     dashBtn.addEventListener('touchend', (e) => { 
-        keys.control = false; 
+        keys.shift = false; 
     });
 
     const abilityKeys = ['z', 'x', 'c', 'v'];

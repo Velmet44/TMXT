@@ -43,10 +43,29 @@ export class Engine {
         this.initUI();
         this.initAuthUI();
         window.addEventListener('resize', () => this.resize());
+        
+        // Auto-pause game when tab is hidden
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && this.isStarted && !this.isPaused && !this.player.isDead) {
+                this.togglePause();
+            }
+        });
     }
 
     initUI() {
         document.getElementById('resume-btn').onclick = () => this.togglePause();
+        
+        // Volume Controls
+        const bgmSlider = document.getElementById('bgm-volume');
+        const sfxSlider = document.getElementById('sfx-volume');
+
+        bgmSlider.oninput = (e) => {
+            soundManager.setVolume('bgm', parseFloat(e.target.value));
+        };
+
+        sfxSlider.oninput = (e) => {
+            soundManager.setVolume('sfx', parseFloat(e.target.value));
+        };
         
         const startBtn = document.getElementById('start-btn');
         if (startBtn) {
@@ -307,6 +326,7 @@ export class Engine {
                     this.player.hp -= dmg;
                     this.screenShake = Math.max(this.screenShake, 15);
                     this.playerHitFlash = 1.0;
+                    soundManager.playSFX('hurt');
                         
                     b.active = false;
                     for(let i=0; i<8; i++) this.particles.push(new BloodParticle(this.player.x, this.player.y));
@@ -373,6 +393,9 @@ export class Engine {
                             if (isCrit) {
                                 this.hitStop = 2;
                                 this.screenShake = Math.max(this.screenShake, 15);
+                                soundManager.playSFX('hit', 0.2); // Higher pitch for crit
+                            } else {
+                                soundManager.playSFX('hit', 0.05);
                             }
                             enemy.takeDamage(damage);
 
@@ -446,6 +469,7 @@ export class Engine {
             const orb = this.xpOrbs[i];
             if (orb.update(this.player, magnetActive)) {
                 orb.sizePop = 15; // Trigger the pop
+                soundManager.playSFX('xp');
                 
                 let gain = orb.value;
                 if (this.player.totalXp > 10000) {
@@ -472,6 +496,7 @@ export class Engine {
                 e.dropsSpawned = true;
                 this.screenShake = Math.max(this.screenShake, 5);
                 this.hitStop = 1; // 1 frame stop on kill feels great
+                soundManager.playSFX('kick');
                 
                 for(let i=0; i<10; i++) this.particles.push(new BloodParticle(e.x, e.y));
                 
@@ -554,6 +579,7 @@ export class Engine {
                 for(let i=0; i<shots; i++) {
                     setTimeout(() => {
                         this.player.attack(targets[0].enemy.x, targets[0].enemy.y);
+                        soundManager.playSFX('shoot', 0.1);
                         this.player.gunRecoil = 10;
                         targets.forEach(t => {
                             const b = new Bullet(this.player.x, this.player.y, t.enemy.x, t.enemy.y);
@@ -582,6 +608,7 @@ export class Engine {
         this.pauseStartTime = Date.now();
         this.screenShake = 15;
         this.damageNumbers.push(new DamageNumber(this.player.x, this.player.y - 60, 'LEVEL UP!', true));
+        soundManager.playSFX('lvlup');
         if (this.player.godMode) this.player.hp = this.player.maxHp;
         const screen = document.getElementById('level-up-screen');
         const list = document.getElementById('upgrade-list');
