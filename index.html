@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>tmxt - Survivor Game</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+
+        <div id="main-menu" class="overlay">
+            <div class="menu-scroll-container">
+                <div class="menu-content split-layout">
+                    <!-- Left: Character Selection -->
+                    <div class="menu-left">
+                        <h2 class="section-label">SELECT OPERATIVE</h2>
+                        <div class="character-preview-box">
+                            <button id="prev-char" class="nav-arrow">◀</button>
+                            <div id="character-display">
+                                <img id="char-preview-img" src="assets/char_1.svg" alt="Operative">
+                            </div>
+                            <button id="next-char" class="nav-arrow">▶</button>
+                        </div>
+                        <div id="char-name">UNIT 01</div>
+                    </div>
+
+                    <!-- Right: Difficulty & Start -->
+                    <div class="menu-right">
+                        <div class="deployment-box">
+                            <h1 class="game-title">TMXT</h1>
+                            <p class="game-subtitle">SURVIVOR</p>
+                            
+                            <div class="menu-actions">
+                                <div class="section-label center">INITIALIZE DIFFICULTY</div>
+                                <div class="difficulty-options">
+                                    <button class="diff-btn" data-diff="EASY">EASY</button>
+                                    <button class="diff-btn active" data-diff="NORMAL">NORMAL</button>
+                                    <button class="diff-btn" data-diff="HARD">HARD</button>
+                                    <button class="diff-btn" data-diff="IMPOSSIBLE">IMPOSSIBLE</button>
+                                </div>
+                                <button id="start-btn" class="glow-button">DEPLOY NOW</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="story-section">
+                    <div class="story-content">
+                        <h2 class="story-title">THE TIMELINE IS FRACTURED</h2>
+                        <p>Step into a broken timeline where zombie outbreaks are appearing across history.</p>
+                        <p>In this endless top-down survival game, you are deployed into unstable time zones to eliminate threats and recover valuable resources. Each run drops you into a different moment in time — your objective is simple: survive as long as possible.</p>
+                        <p>Fight off waves of enemies, collect coins, and discover blueprints for powerful upgrades. Everything you gather can be brought back and used to improve your loadout for the next deployment.</p>
+                        <p>The longer you survive, the more intense it gets. Stronger enemies, faster waves, and complete chaos.</p>
+                        <p class="story-highlight">There is no escape. No final level.</p>
+                        <p class="story-emphasis">Just survive… as long as you can.</p>
+                    </div>
+                </div>
+
+                <div class="credits">
+                    MADE BY <span class="author">VELMET</span>
+                </div>
+            </div>
+        </div>
+        
+        <div id="hud">
+            <div class="bar-container hp-container">
+                <div id="hp-bar" class="bar"></div>
+                <span id="hp-text" class="bar-label">HP: 100 / 100</span>
+            </div>
+            
+            <!-- Energy Bar -->
+            <div class="bar-container energy-container">
+                <div id="energy-bar" class="bar"></div>
+                <span id="energy-text" class="bar-label">ENERGY: 100 / 100</span>
+            </div>
+
+            <div class="bar-container xp-container">
+                <div id="xp-bar" class="bar"></div>
+                <span class="bar-label">LVL <span id="lvl-text">1</span> | <span id="xp-val-text">0</span> / <span id="xp-needed-text">10</span> XP</span>
+            </div>
+            
+            <div id="timer">00:00</div>
+            
+            <!-- Ability Slots -->
+            <div id="ability-slots">
+                <div id="ability-1" class="ability-indicator locked">
+                    <span class="ability-key">Z</span>
+                    <span class="ability-name">CHARGEUP</span>
+                    <div id="ability-cooldown-1" class="cooldown-overlay"></div>
+                </div>
+                <div id="ability-2" class="ability-indicator locked empty">
+                    <span class="ability-key">X</span>
+                    <span class="ability-name">EMPTY</span>
+                    <div id="ability-cooldown-2" class="cooldown-overlay"></div>
+                </div>
+                <div id="ability-3" class="ability-indicator locked empty">
+                    <span class="ability-key">C</span>
+                    <span class="ability-name">EMPTY</span>
+                    <div id="ability-cooldown-3" class="cooldown-overlay"></div>
+                </div>
+                <div id="ability-4" class="ability-indicator locked empty">
+                    <span class="ability-key">V</span>
+                    <span class="ability-name">EMPTY</span>
+                    <div id="ability-cooldown-4" class="cooldown-overlay"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Controls -->
+        <div id="mobile-controls" class="hidden">
+            <div id="joystick-container">
+                <div id="joystick-base">
+                    <div id="joystick-stick"></div>
+                </div>
+            </div>
+            <div id="mobile-buttons">
+                <div class="mobile-btn-row">
+                    <button id="btn-dash" class="mobile-action-btn">DASH</button>
+                    <button id="btn-ability-1" class="mobile-action-btn">CHARGE</button>
+                </div>
+                <div class="mobile-btn-row">
+                    <button id="btn-ability-2" class="mobile-ability-btn">?</button>
+                    <button id="btn-ability-3" class="mobile-ability-btn">?</button>
+                    <button id="btn-ability-4" class="mobile-ability-btn">?</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="escape-menu" class="overlay hidden">
+            <div class="modal pause-modal">
+                <div class="pause-header">
+                    <span class="pause-icon">⏸</span>
+                    <h1>GAME PAUSED</h1>
+                </div>
+                <div class="pause-content">
+                    <div class="stats-section">
+                        <div class="section-title">CHARACTER STATS</div>
+                        <div class="stats-grid" id="pause-stats"></div>
+                    </div>
+                </div>
+                <button id="resume-btn" class="glow-button small">RESUME GAME</button>
+            </div>
+        </div>
+
+        <div id="level-up-screen" class="overlay hidden">
+            <div class="modal">
+                <h1>LEVEL UP!</h1>
+                <p>Choose your path...</p>
+                <div id="upgrade-list"></div>
+            </div>
+        </div>
+
+        <div id="death-screen" class="overlay hidden">
+            <div class="modal death-modal">
+                <h2 id="final-time-label">TIME SURVIVED</h2>
+                <h1 id="final-time">00:00</h1>
+                <hr>
+                <div class="stats-grid" id="death-stats"></div>
+                <button onclick="location.reload()" class="glow-button retry-btn">REDEPLOY</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="src/main.js"></script>
+</body>
+</html>

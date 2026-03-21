@@ -1,0 +1,12 @@
+{
+  "name": "tmxt",
+  "version": "1.0.0",
+  "description": "Survivor-style game",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "npx serve ."
+  },
+  "keywords": [],
+  "author": "Velmet",
+  "license": "ISC"
+}
