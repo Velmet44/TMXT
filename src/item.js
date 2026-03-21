@@ -22,16 +22,18 @@ export class Item {
             return false;
         }
 
+        const dx = player.x - this.x;
+        const dy = player.y - this.y;
+        const distSq = dx * dx + dy * dy;
+
+        // Pickup range (using squared distance for performance)
+        const pickupRangeSq = (this.size + player.size / 2) ** 2;
+        if (distSq < pickupRangeSq) {
+            return true; // Picked up
+        }
+
         // Magnet Pull (Attracts everything EXCEPT other magnets)
         if (isMagnetActive && this.type.id !== 'magnet') {
-            const dx = player.x - this.x;
-            const dy = player.y - this.y;
-            const distSq = dx * dx + dy * dy;
-            
-            if (distSq < 30 * 30) { // Pickup range
-                return true; // Picked up
-            }
-
             // Move towards player
             const dist = Math.sqrt(distSq);
             const speed = 12;
@@ -39,15 +41,6 @@ export class Item {
             this.vy = (dy / dist) * speed;
             this.x += this.vx;
             this.y += this.vy;
-        } else {
-            // Normal collision check (or if it's a magnet, it only picks up when player is on top)
-            const dx = player.x - this.x;
-            const dy = player.y - this.y;
-            const distSq = dx * dx + dy * dy;
-            const colDist = this.size + player.size / 2;
-            if (distSq < colDist * colDist) {
-                return true; // Picked up
-            }
         }
         
         return false;

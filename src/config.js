@@ -100,13 +100,13 @@ export const CONFIG = {
         SIZE: 5
     },
     ITEMS: {
-        DROP_CHANCE: 1, // 5% chance
+        DROP_CHANCE: 0.2, 
         DESPAWN_TIME: 30000, // 30s
         TYPES: {
             MAGNET: { id: 'magnet', color: '#9b59b6', duration: 8000, label: '🧲', chance: 0.15 },
-            HEALTH: { id: 'health', color: '#e74c3c', value: 30, label: '❤️', chance: 0.35 },
-            NUKE: { id: 'nuke', color: '#f1c40f', label: '☢️', chance: 0.10 },
-            SPEED: { id: 'speed', color: '#2ecc71', duration: 10000, value: 1.5, label: '⚡', chance: 0.20 },
+            HEALTH: { id: 'health', color: '#e74c3c', value: 30, label: '❤️', chance: 0.20 },
+            NUKE: { id: 'nuke', color: '#f1c40f', label: '☢️', chance: 0.15 },
+            SPEED: { id: 'speed', color: '#2ecc71', duration: 10000, value: 1.5, label: '⚡', chance: 0.30 },
             RAPID: { id: 'rapid', color: '#e67e22', duration: 8000, value: 0.4, label: '🔫', chance: 0.20 }
         }
     },

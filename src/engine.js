@@ -1,6 +1,6 @@
 import { CONFIG, UPGRADES } from './config.js';
 import { Bullet } from './bullet.js';
-import { XPOrb, Particle, DamageNumber } from './utils.js';
+import { XPOrb, Particle, DamageNumber, SlashParticle } from './utils.js';
 import { Item } from './item.js';
 import { Enemy } from './enemy.js';
 import { keys } from './input.js';
@@ -26,6 +26,7 @@ export class Engine {
         this.difficulty = null;
         this.wasEscapeDown = false;
         this.screenShake = 0;
+        this.nukeFlash = 0;
         
         // Optimization: Larger tiles on mobile to reduce draw calls
         this.tileSize = keys.isMobile ? CONFIG.TILE_SIZE * 2 : CONFIG.TILE_SIZE;
@@ -131,6 +132,10 @@ export class Engine {
         if (this.screenShake > 0) {
             this.screenShake *= 0.9;
             if (this.screenShake < 0.1) this.screenShake = 0;
+        }
+
+        if (this.nukeFlash > 0) {
+            this.nukeFlash -= 0.05;
         }
 
         const now = Date.now();
@@ -277,10 +282,15 @@ export class Engine {
                         this.enemies.forEach(e => {
                             if (!e.isDead) {
                                 e.takeDamage(9999);
-                                this.damageNumbers.push(new DamageNumber(e.x, e.y, '9999', true));
+                                // Slicing effect
+                                for(let j=0; j<3; j++) {
+                                    this.particles.push(new SlashParticle(e.x, e.y, '#fff'));
+                                }
+                                this.damageNumbers.push(new DamageNumber(e.x, e.y, 'NUKE', true));
                             }
                         });
-                        this.screenShake = 20;
+                        this.screenShake = 40;
+                        this.nukeFlash = 1.0;
                         break;
                     case 'speed':
                         this.player.itemEffects.speedEndTime = Date.now() + type.duration;
@@ -332,21 +342,38 @@ export class Engine {
 
                 // ITEM DROP
                 if (Math.random() < CONFIG.ITEMS.DROP_CHANCE) {
-                    const types = CONFIG.ITEMS.TYPES;
-                    let roll = Math.random();
-                    let selectedType = null;
-                    
-                    for (const key in types) {
-                        const type = types[key];
-                        if (roll < type.chance) {
-                            selectedType = type;
-                            break;
+                    // Rule 1: No new item if any powerup is visible on screen
+                    const isAnyItemVisible = this.items.some(item => {
+                        const screenX = item.x - this.camera.x;
+                        const screenY = item.y - this.camera.y;
+                        // Approximate visibility check (matching Item.draw)
+                        return screenX > -100 && screenX < this.canvas.width + 100 &&
+                               screenY > -100 && screenY < this.canvas.height + 100;
+                    });
+
+                    if (!isAnyItemVisible) {
+                        const types = CONFIG.ITEMS.TYPES;
+                        let roll = Math.random();
+                        let selectedType = null;
+                        
+                        for (const key in types) {
+                            const type = types[key];
+                            if (roll < type.chance) {
+                                selectedType = type;
+                                break;
+                            }
+                            roll -= type.chance;
                         }
-                        roll -= type.chance;
-                    }
-                    
-                    if (selectedType) {
-                        this.items.push(new Item(e.x, e.y, selectedType));
+                        
+                        if (selectedType) {
+                            // Rule 2: No duplicate Nuke anywhere
+                            const isNukeOnGround = selectedType.id === 'nuke' && 
+                                                 this.items.some(i => i.type.id === 'nuke');
+                            
+                            if (!isNukeOnGround) {
+                                this.items.push(new Item(e.x, e.y, selectedType));
+                            }
+                        }
                     }
                 }
 
@@ -537,6 +564,11 @@ export class Engine {
         this.particles.forEach(p => p.draw(this.ctx, this.camera));
         this.damageNumbers.forEach(d => d.draw(this.ctx, this.camera));
         this.ctx.restore();
+
+        if (this.nukeFlash > 0) {
+            this.ctx.fillStyle = `rgba(255, 255, 255, ${this.nukeFlash})`;
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        }
     }
 
     drawBackground() {

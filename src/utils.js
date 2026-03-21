@@ -31,22 +31,22 @@ export class XPOrb {
         const dx = player.x - this.x;
         const dy = player.y - this.y;
         const distSq = dx * dx + dy * dy;
-        const magnetDist = CONFIG.XP_ORB.MAGNET_DIST;
+        
+        // Pickup range (using squared distance for performance)
+        const pickupRangeSq = (player.size / 2 + 10) ** 2;
+        if (distSq < pickupRangeSq) {
+            this.active = false;
+            return true;
+        }
 
+        const magnetDist = CONFIG.XP_ORB.MAGNET_DIST;
         if (forceMagnet || distSq < magnetDist * magnetDist) {
             const dist = Math.sqrt(distSq);
             // Stronger pull for global magnet
             const pull = forceMagnet ? 15 : this.speed * (1 + (magnetDist - dist) / 50);
             
-            if (dist > 0) {
-                this.x += (dx / dist) * pull;
-                this.y += (dy / dist) * pull;
-            }
-            
-            if (dist < player.size / 2 + 10) { // Slightly larger pickup radius
-                this.active = false;
-                return true;
-            }
+            this.x += (dx / dist) * pull;
+            this.y += (dy / dist) * pull;
         }
         this.shineTimer += 0.1;
         return false;
@@ -83,6 +83,42 @@ export class XPOrb {
         ctx.beginPath();
         ctx.arc(sx - 1, sy - 1, 1, 0, Math.PI * 2);
         ctx.fill();
+    }
+}
+
+export class SlashParticle {
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.angle = Math.random() * Math.PI * 2;
+        this.length = Math.random() * 100 + 50;
+        this.width = Math.random() * 2 + 1;
+        this.speed = Math.random() * 15 + 10;
+        this.life = 1.0;
+        this.decay = 0.05;
+        this.vx = Math.cos(this.angle) * this.speed;
+        this.vy = Math.sin(this.angle) * this.speed;
+    }
+
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life -= this.decay;
+    }
+
+    draw(ctx, camera) {
+        const sx = this.x - camera.x;
+        const sy = this.y - camera.y;
+        ctx.save();
+        ctx.globalAlpha = this.life;
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = this.width;
+        ctx.beginPath();
+        ctx.moveTo(sx - Math.cos(this.angle) * this.length/2, sy - Math.sin(this.angle) * this.length/2);
+        ctx.lineTo(sx + Math.cos(this.angle) * this.length/2, sy + Math.sin(this.angle) * this.length/2);
+        ctx.stroke();
+        ctx.restore();
     }
 }
 
