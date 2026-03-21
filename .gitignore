@@ -1,22 +1,10 @@
-# Node
-node_modules/
-npm-debug.log
-yarn-error.log
+# Ignore everything by default
+*
 
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Cloudflare Wrangler
-.wrangler/
-
-# System
-.DS_Store
-Thumbs.db
-
-# Build
-dist/
-build/
+# Unignore specific directories and files
+!*/
+!assets/**
+!css/**
+!src/**
+!index.html
+!.gitignore
