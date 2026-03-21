@@ -59,12 +59,12 @@ export const CONFIG = {
             SPAWN_WEIGHT: 0.4
         },
         EXPLODER: {
-            SPEED: 6,
-            HP: 15,
+            SPEED: 8,
+            HP: 25,
             SIZE: 18,
             DAMAGE: 40,
             RANGE: 40,
-            ATTACK_COOLDOWN: 1000, // Fuse time equivalent
+            ATTACK_COOLDOWN: 500, // Fuse time equivalent
             XP_BASE: 20,
             XP_MAX: 400,
             ENERGY_DROP: 15,
@@ -83,7 +83,7 @@ export const CONFIG = {
         SPEED: 10,
         EXPLOSION_FORCE: 6,
         PICKUP_DELAY: 500,
-        MAX_ORBS: 150 // Lag prevention limit
+        MAX_ORBS: 500 // Lag prevention limit
     },
     DIFFICULTIES: {
         EASY: { label: 'EASY', hpMult: 1.5, enemyHp: 0.7, enemySpeed: 0.8, enemyDmg: 0.6, xpMult: 1.2, spawnRateMult: 1.2 },
@@ -100,8 +100,8 @@ export const CONFIG = {
         SIZE: 5
     },
     ITEMS: {
-        DROP_CHANCE: 1, // 5% chance
-        DESPAWN_TIME: 30000, // 30s
+        DROP_CHANCE: 0.03, 
+        DESPAWN_TIME: 20000, 
         TYPES: {
             MAGNET: { id: 'magnet', color: '#9b59b6', duration: 8000, label: '🧲' },
             HEALTH: { id: 'health', color: '#e74c3c', value: 30, label: '❤️' },
@@ -119,7 +119,7 @@ export const CONFIG = {
         SKELETON: '#ecf0f1',
         LADYBUG: '#e74c3c',
         XP: '#3498db',
-        ENERGY: '#9b59b6', // Purple Energy
+        ENERGY: '#9b59b6', 
         BULLET: '#f39c12',
         ARROW: '#bdc3c7',
         COMMON: '#bdc3c7',
