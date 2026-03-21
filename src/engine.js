@@ -1,6 +1,7 @@
 import { CONFIG, UPGRADES } from './config.js';
 import { Bullet } from './bullet.js';
 import { XPOrb, Particle, DamageNumber } from './utils.js';
+import { Item } from './item.js';
 import { Enemy } from './enemy.js';
 import { keys } from './input.js';
 
@@ -13,6 +14,7 @@ export class Engine {
         this.enemies = [];
         this.bullets = [];
         this.xpOrbs = [];
+        this.items = []; // New items array
         this.particles = [];
         this.damageNumbers = [];
         this.startTime = Date.now();
@@ -234,10 +236,57 @@ export class Engine {
             }
         });
 
+        // Items Logic
+        const magnetActive = this.player.itemEffects.magnetEndTime > Date.now();
+        
+        for (let i = this.items.length - 1; i >= 0; i--) {
+            const item = this.items[i];
+            // Check pickup (returns true if picked up)
+            if (item.update(this.player, magnetActive)) {
+                
+                // Apply Effect
+                const type = item.type;
+                switch(type.id) {
+                    case 'magnet':
+                        this.player.itemEffects.magnetEndTime = Date.now() + type.duration;
+                        break;
+                    case 'health':
+                        this.player.hp = Math.min(this.player.maxHp, this.player.hp + type.value);
+                        this.damageNumbers.push(new DamageNumber(this.player.x, this.player.y - 40, '+HP', true));
+                        break;
+                    case 'nuke':
+                        this.enemies.forEach(e => {
+                            if (!e.isDead) {
+                                e.takeDamage(9999);
+                                this.damageNumbers.push(new DamageNumber(e.x, e.y, '9999', true));
+                            }
+                        });
+                        this.screenShake = 20;
+                        break;
+                    case 'speed':
+                        this.player.itemEffects.speedEndTime = Date.now() + type.duration;
+                        break;
+                    case 'rapid':
+                        this.player.itemEffects.rapidEndTime = Date.now() + type.duration;
+                        break;
+                }
+                
+                // Show Floating Text
+                if (type.id !== 'health' && type.id !== 'nuke') {
+                    this.damageNumbers.push(new DamageNumber(this.player.x, this.player.y - 40, type.label, true));
+                }
+
+                this.items.splice(i, 1);
+            } else if (!item.active) {
+                // Despawned naturally
+                this.items.splice(i, 1);
+            }
+        }
+
         // XP Optimization: Process orbs with standard for loop (faster than forEach)
         for (let i = this.xpOrbs.length - 1; i >= 0; i--) {
             const orb = this.xpOrbs[i];
-            if (orb.update(this.player)) {
+            if (orb.update(this.player, magnetActive)) {
                 if (this.player.addXP(orb.value)) {
                     this.triggerLevelUp();
                 }
@@ -254,12 +303,20 @@ export class Engine {
         this.damageNumbers = this.damageNumbers.filter(d => d.life > 0);
 
         this.enemies.forEach(e => {
-            if (e.isDead && e.deathTimer === 0.05) {
+            if (e.isDead && !e.dropsSpawned) {
+                e.dropsSpawned = true;
                 this.screenShake = Math.max(this.screenShake, 3);
                 this.spawnHitParticles(e.x, e.y, CONFIG.COLORS.ZOMBIE, 10);
                 
                 const cfg = CONFIG.ENEMY[e.type.toUpperCase()] || CONFIG.ENEMY.ZOMBIE;
                 this.player.energy = Math.min(this.player.maxEnergy, this.player.energy + cfg.ENERGY_DROP);
+
+                // ITEM DROP
+                if (Math.random() < CONFIG.ITEMS.DROP_CHANCE) {
+                    const typeKeys = Object.keys(CONFIG.ITEMS.TYPES);
+                    const randomKey = typeKeys[Math.floor(Math.random() * typeKeys.length)];
+                    this.items.push(new Item(e.x, e.y, CONFIG.ITEMS.TYPES[randomKey]));
+                }
 
                 const xpRange = cfg.XP_MAX - cfg.XP_BASE;
                 const totalXP = Math.floor(cfg.XP_BASE + (e.level - 1) * (xpRange / 7));
@@ -436,6 +493,7 @@ export class Engine {
 
         this.drawBackground();
         this.xpOrbs.forEach(o => o.draw(this.ctx, this.camera));
+        this.items.forEach(i => i.draw(this.ctx, this.camera));
         this.bullets.forEach(b => b.draw(this.ctx, this.camera));
         this.enemies.forEach(enemy => enemy.draw(this.ctx, this.camera));
         this.player.draw(this.ctx, this.camera);

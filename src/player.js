@@ -49,6 +49,13 @@ export class Player {
         // Sprite Selection
         this.sprite = new Image();
         this.sprite.src = 'assets/char_1.svg';
+
+        // Item Effects
+        this.itemEffects = {
+            magnetEndTime: 0,
+            speedEndTime: 0,
+            rapidEndTime: 0
+        };
     }
 
     setCharacter(index) {
@@ -147,7 +154,11 @@ export class Player {
     }
 
     getCurrentSpeed() {
-        return this.isChargedUp ? this.speed * 1.5 : this.speed;
+        let speed = this.isChargedUp ? this.speed * 1.5 : this.speed;
+        if (this.itemEffects.speedEndTime > Date.now()) {
+            speed *= CONFIG.ITEMS.TYPES.SPEED.value;
+        }
+        return speed;
     }
 
     getCurrentDamage() {
@@ -155,7 +166,11 @@ export class Player {
     }
 
     getCurrentAtkCooldown() {
-        return this.isChargedUp ? this.atkCooldown * 0.5 : this.atkCooldown;
+        let cd = this.isChargedUp ? this.atkCooldown * 0.5 : this.atkCooldown;
+        if (this.itemEffects.rapidEndTime > Date.now()) {
+            cd *= CONFIG.ITEMS.TYPES.RAPID.value;
+        }
+        return cd;
     }
 
     startDash() {

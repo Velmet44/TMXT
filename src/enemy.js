@@ -38,6 +38,7 @@ export class Enemy {
         // Exploder specific
         this.isExploding = false;
         this.fuseTimer = 0;
+        this.dropsSpawned = false;
     }
 
     updateStats() {

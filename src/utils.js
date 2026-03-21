@@ -19,7 +19,7 @@ export class XPOrb {
         this.shineTimer = Math.random() * 10;
     }
 
-    update(player) {
+    update(player, forceMagnet = false) {
         this.x += this.vx;
         this.y += this.vy;
         this.vx *= this.friction;
@@ -33,13 +33,17 @@ export class XPOrb {
         const distSq = dx * dx + dy * dy;
         const magnetDist = CONFIG.XP_ORB.MAGNET_DIST;
 
-        if (distSq < magnetDist * magnetDist) {
+        if (forceMagnet || distSq < magnetDist * magnetDist) {
             const dist = Math.sqrt(distSq);
-            const pull = this.speed * (1 + (magnetDist - dist) / 50);
-            this.x += (dx / dist) * pull;
-            this.y += (dy / dist) * pull;
+            // Stronger pull for global magnet
+            const pull = forceMagnet ? 15 : this.speed * (1 + (magnetDist - dist) / 50);
             
-            if (dist < player.size / 2) {
+            if (dist > 0) {
+                this.x += (dx / dist) * pull;
+                this.y += (dy / dist) * pull;
+            }
+            
+            if (dist < player.size / 2 + 10) { // Slightly larger pickup radius
                 this.active = false;
                 return true;
             }
@@ -138,11 +142,14 @@ export class DamageNumber {
         ctx.fillStyle = this.isCrit ? '#f1c40f' : '#fff';
         ctx.font = `bold ${this.isCrit ? (keys.isMobile ? 18 : 24) : (keys.isMobile ? 12 : 16)}px Segoe UI`;
         ctx.textAlign = 'center';
-        ctx.fillText(Math.round(this.amount), sx, sy);
+        
+        const text = typeof this.amount === 'number' ? Math.round(this.amount) : this.amount;
+        ctx.fillText(text, sx, sy);
+        
         if (this.isCrit && !keys.isMobile) {
             ctx.strokeStyle = '#000';
             ctx.lineWidth = 1;
-            ctx.strokeText(Math.round(this.amount), sx, sy);
+            ctx.strokeText(text, sx, sy);
         }
         if (!keys.isMobile) ctx.globalAlpha = 1.0;
     }

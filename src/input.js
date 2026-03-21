@@ -95,6 +95,14 @@ class Joystick {
 // Keyboard Handling
 window.addEventListener('keydown', (e) => {
     const key = e.key.toLowerCase();
+
+    // Prevent default browser actions for game controls (e.g., Ctrl+S, Ctrl+W)
+    if (e.ctrlKey || e.metaKey) {
+        if (['w', 'a', 's', 'd', 'z', 'x', 'c', 'v'].includes(key)) {
+            e.preventDefault();
+        }
+    }
+
     if (key === 'escape') keys.escape = true;
     else if (key === 'control') keys.control = true;
     else if (key in keys) keys[key] = true;
