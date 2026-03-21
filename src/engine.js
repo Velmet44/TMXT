@@ -18,6 +18,8 @@ export class Engine {
         this.particles = [];
         this.damageNumbers = [];
         this.startTime = Date.now();
+        this.elapsedTime = 0; // Cumulative time in seconds
+        this.pauseStartTime = 0;
         this.lastSpawn = 0;
         this.isPaused = false;
         this.isStarted = false;
@@ -65,10 +67,24 @@ export class Engine {
     togglePause() {
         this.isPaused = !this.isPaused;
         const menu = document.getElementById('escape-menu');
+        const pauseTitle = menu.querySelector('h1');
+        
         if (this.isPaused) {
+            this.pauseStartTime = Date.now();
             menu.classList.remove('hidden');
             this.updateStatsGrid('pause-stats');
+            
+            // Show time survived in pause menu
+            const seconds = Math.floor(this.elapsedTime % 60);
+            const minutes = Math.floor(this.elapsedTime / 60);
+            const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            pauseTitle.innerText = `PAUSED - ${timeStr}`;
         } else {
+            // Adjust startTime to ignore the duration spent in pause
+            if (this.pauseStartTime > 0) {
+                this.startTime += (Date.now() - this.pauseStartTime);
+                this.pauseStartTime = 0;
+            }
             menu.classList.add('hidden');
         }
     }
@@ -118,7 +134,10 @@ export class Engine {
         }
 
         const now = Date.now();
-        const elapsedTime = (now - this.startTime) / 1000;
+        if (!this.isPaused) {
+            this.elapsedTime = (now - this.startTime) / 1000;
+        }
+        const elapsedTime = this.elapsedTime;
         
         // Ramp difficulty every full minute using config multiplier
         const minutesElapsed = Math.floor(elapsedTime / 60);
@@ -313,9 +332,22 @@ export class Engine {
 
                 // ITEM DROP
                 if (Math.random() < CONFIG.ITEMS.DROP_CHANCE) {
-                    const typeKeys = Object.keys(CONFIG.ITEMS.TYPES);
-                    const randomKey = typeKeys[Math.floor(Math.random() * typeKeys.length)];
-                    this.items.push(new Item(e.x, e.y, CONFIG.ITEMS.TYPES[randomKey]));
+                    const types = CONFIG.ITEMS.TYPES;
+                    let roll = Math.random();
+                    let selectedType = null;
+                    
+                    for (const key in types) {
+                        const type = types[key];
+                        if (roll < type.chance) {
+                            selectedType = type;
+                            break;
+                        }
+                        roll -= type.chance;
+                    }
+                    
+                    if (selectedType) {
+                        this.items.push(new Item(e.x, e.y, selectedType));
+                    }
                 }
 
                 const xpRange = cfg.XP_MAX - cfg.XP_BASE;
@@ -376,6 +408,7 @@ export class Engine {
 
     triggerLevelUp() {
         this.isPaused = true;
+        this.pauseStartTime = Date.now();
         this.screenShake = 15;
         if (this.player.godMode) this.player.hp = this.player.maxHp;
         const screen = document.getElementById('level-up-screen');
@@ -395,6 +428,10 @@ export class Engine {
             card.onclick = () => {
                 upg.apply(this.player);
                 this.isPaused = false;
+                if (this.pauseStartTime > 0) {
+                    this.startTime += (Date.now() - this.pauseStartTime);
+                    this.pauseStartTime = 0;
+                }
                 screen.classList.add('hidden');
             };
             list.appendChild(card);
