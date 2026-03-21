@@ -25,6 +25,7 @@ export class Player {
         this.isDashing = false;
         this.dashStartTime = 0;
         this.dashDir = { x: 0, y: 0 };
+        this.dashTrail = [];
         
         // Ability State
         this.isChargedUp = false;
@@ -33,6 +34,7 @@ export class Player {
         // Leveling
         this.level = 1;
         this.xp = 0;
+        this.totalXp = 0;
         this.xpToNext = 10;
         
         // Animation & State
@@ -85,9 +87,20 @@ export class Player {
             if (now - this.dashStartTime < CONFIG.PLAYER.DASH_DURATION) {
                 this.x += this.dashDir.x * CONFIG.PLAYER.DASH_SPEED;
                 this.y += this.dashDir.y * CONFIG.PLAYER.DASH_SPEED;
-                return; // Lock other movement during dash
+                // Add to trail every 2 frames
+                if (this.frame % 2 === 0) {
+                    this.dashTrail.push({ x: this.x, y: this.y, life: 1.0, facing: this.facing });
+                }
             } else {
                 this.isDashing = false;
+            }
+        }
+
+        // Update trail
+        for (let i = this.dashTrail.length - 1; i >= 0; i--) {
+            this.dashTrail[i].life -= 0.1;
+            if (this.dashTrail[i].life <= 0) {
+                this.dashTrail.splice(i, 1);
             }
         }
 
@@ -180,6 +193,7 @@ export class Player {
         this.energy -= CONFIG.PLAYER.DASH_COST;
         this.isDashing = true;
         this.dashStartTime = Date.now();
+        this.dashTrail = [];
     }
 
     activateChargeUp() {
@@ -191,6 +205,7 @@ export class Player {
     addXP(amount) {
         const xpGain = this.difficulty ? amount * this.difficulty.xpMult : amount;
         this.xp += xpGain;
+        this.totalXp += xpGain;
         if (this.xp >= this.xpToNext) {
             this.xp -= this.xpToNext;
             this.level++;
@@ -226,6 +241,14 @@ export class Player {
     draw(ctx, camera) {
         const screenX = this.x - camera.x;
         const screenY = this.y - camera.y;
+
+        // Draw Dash Trail
+        ctx.save();
+        this.dashTrail.forEach(p => {
+            ctx.globalAlpha = p.life * 0.5;
+            ctx.drawImage(this.sprite, p.x - camera.x - this.size/2, p.y - camera.y - this.size/2, this.size, this.size);
+        });
+        ctx.restore();
 
         ctx.save();
         ctx.translate(screenX, screenY);

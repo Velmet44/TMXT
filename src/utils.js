@@ -17,6 +17,7 @@ export class XPOrb {
         this.vy = Math.sin(angle) * force;
         this.friction = 0.95;
         this.shineTimer = Math.random() * 10;
+        this.sizePop = 0;
     }
 
     update(player, forceMagnet = false) {
@@ -49,6 +50,11 @@ export class XPOrb {
             this.y += (dy / dist) * pull;
         }
         this.shineTimer += 0.1;
+        
+        if (this.sizePop > 0) {
+            this.sizePop *= 0.9;
+        }
+
         return false;
     }
 
@@ -65,7 +71,7 @@ export class XPOrb {
         }
 
         const shine = Math.sin(this.shineTimer) * 2;
-        const currentSize = this.size + shine;
+        const currentSize = this.size + shine + this.sizePop;
 
         // Optimized Glow (Fast)
         ctx.fillStyle = CONFIG.COLORS.XP;
@@ -128,29 +134,64 @@ export class Particle {
         this.y = y;
         this.color = color;
         const angle = Math.random() * Math.PI * 2;
-        const speed = Math.random() * 4 + 2;
+        const speed = Math.random() * 6 + 2;
         this.vx = Math.cos(angle) * speed;
         this.vy = Math.sin(angle) * speed;
         this.life = 1.0;
-        this.decay = Math.random() * 0.05 + 0.02;
-        this.size = Math.random() * 4 + 2;
+        this.decay = Math.random() * 0.03 + 0.01;
+        this.size = Math.random() * 6 + 2;
+        this.gravity = 0.15;
+        this.rotation = Math.random() * Math.PI * 2;
+        this.rotSpeed = (Math.random() - 0.5) * 0.2;
     }
 
     update() {
         this.x += this.vx;
         this.y += this.vy;
+        this.vy += this.gravity;
+        this.vx *= 0.96;
+        this.vy *= 0.96;
         this.life -= this.decay;
-        this.vx *= 0.95;
-        this.vy *= 0.95;
+        this.rotation += this.rotSpeed;
     }
 
     draw(ctx, camera) {
         const sx = this.x - camera.x;
         const sy = this.y - camera.y;
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.rotate(this.rotation);
         if (!keys.isMobile) ctx.globalAlpha = this.life;
         ctx.fillStyle = this.color;
-        ctx.fillRect(sx - this.size/2, sy - this.size/2, this.size, this.size);
-        if (!keys.isMobile) ctx.globalAlpha = 1.0;
+        const s = this.size * this.life;
+        ctx.fillRect(-s/2, -s/2, s, s);
+        ctx.restore();
+    }
+}
+
+export class BloodParticle extends Particle {
+    constructor(x, y) {
+        super(x, y, '#e74c3c');
+        this.decay = Math.random() * 0.02 + 0.005;
+        this.size = Math.random() * 8 + 4;
+        this.gravity = 0.25;
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 8 + 4;
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed;
+    }
+
+    draw(ctx, camera) {
+        const sx = this.x - camera.x;
+        const sy = this.y - camera.y;
+        ctx.save();
+        if (!keys.isMobile) ctx.globalAlpha = this.life;
+        ctx.fillStyle = this.color;
+        // Blood is more like droplets
+        ctx.beginPath();
+        ctx.arc(sx, sy, this.size * this.life / 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
     }
 }
 
@@ -190,83 +231,3 @@ export class DamageNumber {
         if (!keys.isMobile) ctx.globalAlpha = 1.0;
     }
 }
-
-// PROCEDURAL SOUNDS USING WEB AUDIO API
-class SoundManager {
-    constructor() {
-        this.ctx = null;
-    }
-
-    init() {
-        if (!this.ctx) {
-            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-    }
-
-    play(type) {
-        if (!this.ctx) return;
-        if (this.ctx.state === 'suspended') this.ctx.resume();
-
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-
-        const now = this.ctx.currentTime;
-
-        switch (type) {
-            case 'shoot':
-                osc.type = 'square';
-                osc.frequency.setValueAtTime(440, now);
-                osc.frequency.exponentialRampToValueAtTime(110, now + 0.1);
-                gain.gain.setValueAtTime(0.1, now);
-                gain.gain.linearRampToValueAtTime(0, now + 0.1);
-                osc.start(now);
-                osc.stop(now + 0.1);
-                break;
-            case 'hit':
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(150, now);
-                osc.frequency.linearRampToValueAtTime(50, now + 0.1);
-                gain.gain.setValueAtTime(0.1, now);
-                gain.gain.linearRampToValueAtTime(0, now + 0.1);
-                osc.start(now);
-                osc.stop(now + 0.1);
-                break;
-            case 'xp':
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(880 + Math.random() * 440, now);
-                osc.frequency.exponentialRampToValueAtTime(1760, now + 0.05);
-                gain.gain.setValueAtTime(0.05, now);
-                gain.gain.linearRampToValueAtTime(0, now + 0.05);
-                osc.start(now);
-                osc.stop(now + 0.05);
-                break;
-            case 'lvlup':
-                const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
-                notes.forEach((freq, i) => {
-                    const o = this.ctx.createOscillator();
-                    const g = this.ctx.createGain();
-                    o.connect(g);
-                    g.connect(this.ctx.destination);
-                    o.frequency.setValueAtTime(freq, now + i * 0.1);
-                    g.gain.setValueAtTime(0.1, now + i * 0.1);
-                    g.gain.linearRampToValueAtTime(0, now + i * 0.1 + 0.3);
-                    o.start(now + i * 0.1);
-                    o.stop(now + i * 0.1 + 0.3);
-                });
-                break;
-            case 'dash':
-                osc.type = 'white' || 'triangle';
-                osc.frequency.setValueAtTime(200, now);
-                osc.frequency.exponentialRampToValueAtTime(800, now + 0.15);
-                gain.gain.setValueAtTime(0.1, now);
-                gain.gain.linearRampToValueAtTime(0, now + 0.15);
-                osc.start(now);
-                osc.stop(now + 0.15);
-                break;
-        }
-    }
-}
-
-export const SOUNDS = new SoundManager();

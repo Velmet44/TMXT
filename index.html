@@ -13,6 +13,9 @@
         <canvas id="game-canvas"></canvas>
 
         <div id="main-menu" class="overlay">
+            <div class="menu-top-right">
+                <button id="auth-nav-btn" class="auth-nav-btn">LOGIN / SIGNUP</button>
+            </div>
             <div class="menu-scroll-container">
                 <div class="menu-content split-layout">
                     <!-- Left: Character Selection -->
@@ -161,6 +164,44 @@
                 <hr>
                 <div class="stats-grid" id="death-stats"></div>
                 <button onclick="location.reload()" class="glow-button retry-btn">REDEPLOY</button>
+            </div>
+        </div>
+
+        <!-- AUTH MODAL -->
+        <div id="auth-modal" class="overlay hidden">
+            <div class="modal auth-modal-box">
+                <div id="auth-logged-out">
+                    <h1 class="auth-title">OPERATIVE AUTH</h1>
+                    <p>Enter the timeline with an account to sync progress.</p>
+                    
+                    <button id="google-login-btn" class="auth-btn google-btn">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G">
+                        CONTINUE WITH GOOGLE
+                    </button>
+
+                    <div class="auth-divider">OR</div>
+
+                    <input type="email" id="auth-email" placeholder="EMAIL" class="auth-input">
+                    <input type="password" id="auth-password" placeholder="PASSWORD" class="auth-input">
+                    
+                    <div class="auth-buttons">
+                        <button id="login-btn" class="auth-btn">LOGIN</button>
+                        <button id="signup-btn" class="auth-btn">SIGN UP</button>
+                    </div>
+                </div>
+
+                <div id="auth-logged-in" class="hidden">
+                    <h1 class="auth-title">OPERATIVE PROFILE</h1>
+                    <div id="user-info-box">
+                        <div class="profile-label">CURRENT OPERATIVE</div>
+                        <div id="user-email"></div>
+                        <div class="profile-status">CONNECTION: ESTABLISHED</div>
+                    </div>
+                    <button id="logout-btn" class="auth-btn logout-btn">LOGOUT</button>
+                </div>
+
+                <div id="auth-message" class="auth-msg"></div>
+                <button id="close-auth-btn" class="close-btn">CLOSE</button>
             </div>
         </div>
     </div>

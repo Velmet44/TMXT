@@ -100,7 +100,7 @@ export const CONFIG = {
         SIZE: 5
     },
     ITEMS: {
-        DROP_CHANCE: 0.2, 
+        DROP_CHANCE: 0.05, 
         DESPAWN_TIME: 30000, // 30s
         TYPES: {
             MAGNET: { id: 'magnet', color: '#9b59b6', duration: 8000, label: '🧲', chance: 0.15 },

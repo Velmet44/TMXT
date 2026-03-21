@@ -95,25 +95,31 @@ class Joystick {
 // Keyboard Handling
 window.addEventListener('keydown', (e) => {
     const key = e.key.toLowerCase();
-
-    // Prevent default browser actions for game controls (e.g., Ctrl+S, Ctrl+W)
+    
+    // Prevent default browser actions for game controls (e.g., Ctrl+S, Ctrl+W, Space)
+    const blockedKeys = ['w', 'a', 's', 'd', 'z', 'x', 'c', 'v', 'r', 'f', 'g', 's'];
     if (e.ctrlKey || e.metaKey) {
-        if (['w', 'a', 's', 'd', 'z', 'x', 'c', 'v'].includes(key)) {
+        if (blockedKeys.includes(key)) {
             e.preventDefault();
         }
+    }
+
+    // Always block Space default (scrolling)
+    if (key === ' ' || key === 'spacebar') {
+        e.preventDefault();
     }
 
     if (key === 'escape') keys.escape = true;
     else if (key === 'control') keys.control = true;
     else if (key in keys) keys[key] = true;
-});
+}, { capture: true });
 
 window.addEventListener('keyup', (e) => {
     const key = e.key.toLowerCase();
     if (key === 'escape') keys.escape = false;
     else if (key === 'control') keys.control = false;
     else if (key in keys) keys[key] = false;
-});
+}, { capture: true });
 
 // Mobile Optimization: Fullscreen & Landscape
 function requestMobileOptimizations() {
@@ -215,7 +221,11 @@ if (keys.isMobile) {
     });
 
     // Request orientations early on any user interaction in the menu to ensure lock works
-    document.addEventListener('touchstart', () => {
-        if (mainMenu.offsetParent) requestMobileOptimizations();
-    }, { once: true });
+    const triggerOptimizations = () => {
+        if (mainMenu && !mainMenu.classList.contains('hidden')) {
+            requestMobileOptimizations();
+        }
+    };
+    document.addEventListener('touchstart', triggerOptimizations, { once: true });
+    document.addEventListener('mousedown', triggerOptimizations, { once: true });
 }

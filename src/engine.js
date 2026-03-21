@@ -1,9 +1,11 @@
 import { CONFIG, UPGRADES } from './config.js';
 import { Bullet } from './bullet.js';
-import { XPOrb, Particle, DamageNumber, SlashParticle } from './utils.js';
+import { XPOrb, Particle, DamageNumber, SlashParticle, BloodParticle } from './utils.js';
 import { Item } from './item.js';
 import { Enemy } from './enemy.js';
 import { keys } from './input.js';
+import { login, signUp, logout, getSession, supabase, signInWithGoogle } from './auth.js';
+import { soundManager } from './SoundManager.js';
 
 export class Engine {
     constructor(canvas, player) {
@@ -27,13 +29,19 @@ export class Engine {
         this.wasEscapeDown = false;
         this.screenShake = 0;
         this.nukeFlash = 0;
+        this.hitStop = 0;
+        this.playerHitFlash = 0;
         
+        // Start Menu BGM
+        soundManager.playBGM('menu');
+
         // Optimization: Larger tiles on mobile to reduce draw calls
         this.tileSize = keys.isMobile ? CONFIG.TILE_SIZE * 2 : CONFIG.TILE_SIZE;
 
         this.resize();
         this.updateHUD();
         this.initUI();
+        this.initAuthUI();
         window.addEventListener('resize', () => this.resize());
     }
 
@@ -53,6 +61,9 @@ export class Engine {
                 this.player.difficulty = this.difficulty;
                 this.player.setCharacter(keys.selectedCharIndex || 1);
                 
+                // Play Game BGM
+                soundManager.playBGM('game');
+
                 // Adjust Player HP
                 this.player.maxHp = Math.round(this.player.maxHp * this.difficulty.hpMult);
                 this.player.hp = this.player.maxHp;
@@ -62,6 +73,101 @@ export class Engine {
                     document.documentElement.requestFullscreen().catch(() => {});
                 }
             });
+        }
+    }
+
+    async initAuthUI() {
+        const authNavBtn = document.getElementById('auth-nav-btn');
+        const authModal = document.getElementById('auth-modal');
+        const closeAuthBtn = document.getElementById('close-auth-btn');
+        const googleBtn = document.getElementById('google-login-btn');
+        const loginBtn = document.getElementById('login-btn');
+        const signupBtn = document.getElementById('signup-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+        const emailInput = document.getElementById('auth-email');
+        const passInput = document.getElementById('auth-password');
+        const msgDiv = document.getElementById('auth-message');
+
+        const updateMessage = (text, isError = false) => {
+            msgDiv.innerText = text;
+            msgDiv.style.color = isError ? '#e74c3c' : '#2ecc71';
+        };
+
+        authNavBtn.onclick = () => {
+            authModal.classList.remove('hidden');
+        };
+
+        closeAuthBtn.onclick = () => {
+            authModal.classList.add('hidden');
+            updateMessage('');
+        };
+
+        googleBtn.onclick = async () => {
+            updateMessage('Redirecting to Google...');
+            const { error } = await signInWithGoogle();
+            if (error) updateMessage(error.message, true);
+        };
+
+        loginBtn.onclick = async () => {
+            const email = emailInput.value;
+            const pass = passInput.value;
+            if (!email || !pass) return updateMessage('Enter email and password', true);
+            
+            updateMessage('Logging in...');
+            const { data, error } = await login(email, pass);
+            if (error) updateMessage(error.message, true);
+            else {
+                updateMessage('Login successful!');
+                setTimeout(() => authModal.classList.add('hidden'), 1000);
+            }
+        };
+
+        signupBtn.onclick = async () => {
+            const email = emailInput.value;
+            const pass = passInput.value;
+            if (!email || !pass) return updateMessage('Enter email and password', true);
+
+            updateMessage('Signing up...');
+            const { data, error } = await signUp(email, pass);
+            if (error) updateMessage(error.message, true);
+            else updateMessage('Signup successful! Check your email.');
+        };
+
+        logoutBtn.onclick = async () => {
+            updateMessage('Logging out...');
+            const { error } = await logout();
+            if (error) updateMessage(error.message, true);
+            else {
+                updateMessage('Logged out.');
+                setTimeout(() => authModal.classList.add('hidden'), 1000);
+            }
+        };
+
+        // Listen for auth state changes
+        supabase.auth.onAuthStateChange((event, session) => {
+            this.updateAuthUI(session);
+        });
+
+        // Initial check
+        const session = await getSession();
+        this.updateAuthUI(session);
+    }
+
+    updateAuthUI(session) {
+        const authNavBtn = document.getElementById('auth-nav-btn');
+        const loggedOutView = document.getElementById('auth-logged-out');
+        const loggedInView = document.getElementById('auth-logged-in');
+        const userEmailSpan = document.getElementById('user-email');
+
+        if (session && session.user) {
+            authNavBtn.innerText = 'PROFILE';
+            loggedOutView.classList.add('hidden');
+            loggedInView.classList.remove('hidden');
+            userEmailSpan.innerText = session.user.email;
+        } else {
+            authNavBtn.innerText = 'LOGIN / SIGNUP';
+            loggedOutView.classList.remove('hidden');
+            loggedInView.classList.add('hidden');
         }
     }
 
@@ -98,13 +204,21 @@ export class Engine {
 
     update() {
         if (!this.isStarted) return;
-        
+
+        // Hit Stop: Momentarily freeze game for impact feel
+        if (this.hitStop > 0) {
+            this.hitStop--;
+            return;
+        }
+
         if (keys.escape && !this.wasEscapeDown && !this.player.isDead && !document.getElementById('level-up-screen').offsetParent) {
             this.togglePause();
         }
         this.wasEscapeDown = keys.escape;
 
         if (this.isPaused || this.player.isDead) {
+            // ... (rest of the death/pause handling)
+
             if (this.player.isDead) {
                 const screen = document.getElementById('death-screen');
                 if (screen.classList.contains('hidden')) {
@@ -191,9 +305,12 @@ export class Engine {
                     let dmg = b.damage;
                     if (this.player.armor) dmg *= (1 - this.player.armor);
                     this.player.hp -= dmg;
-                    this.screenShake = Math.max(this.screenShake, 8);
+                    this.screenShake = Math.max(this.screenShake, 15);
+                    this.playerHitFlash = 1.0;
+                        
                     b.active = false;
-                    this.spawnHitParticles(b.x, b.y, '#e74c3c');
+                    for(let i=0; i<8; i++) this.particles.push(new BloodParticle(this.player.x, this.player.y));
+
                 }
             }
         });
@@ -211,8 +328,11 @@ export class Engine {
                         let dmg = skel.damage;
                         if (this.player.armor) dmg *= (1 - this.player.armor);
                         this.player.hp -= dmg;
-                        this.screenShake = Math.max(this.screenShake, 15);
-                        this.spawnHitParticles(skel.x, skel.y, '#e67e22', 20);
+                        this.screenShake = Math.max(this.screenShake, 25);
+                        this.playerHitFlash = 1.0;
+                        
+                        this.hitStop = 5; // Freeze for 5 frames on big hit
+                        for(let i=0; i<15; i++) this.particles.push(new BloodParticle(this.player.x, this.player.y));
                     }
                 } else {
                     this.bullets.push(new Bullet(skel.x, skel.y, target.x, target.y, true));
@@ -231,7 +351,11 @@ export class Engine {
                         if (this.player.armor) dmg *= (1 - this.player.armor);
                         this.player.hp -= dmg;
                         enemy.resetAttackCooldown();
-                        this.screenShake = Math.max(this.screenShake, 4);
+                        this.screenShake = Math.max(this.screenShake, 10);
+                        this.playerHitFlash = 1.0;
+                        
+                        this.hitStop = 2;
+                        for(let i=0; i<5; i++) this.particles.push(new BloodParticle(this.player.x, this.player.y));
                     }
                 }
 
@@ -246,7 +370,12 @@ export class Engine {
                             const isCrit = this.player.critChance && Math.random() < this.player.critChance;
                             if (isCrit) damage *= 2;
                             
+                            if (isCrit) {
+                                this.hitStop = 2;
+                                this.screenShake = Math.max(this.screenShake, 15);
+                            }
                             enemy.takeDamage(damage);
+
                             this.damageNumbers.push(new DamageNumber(enemy.x, enemy.y, damage, isCrit));
                             this.spawnHitParticles(bullet.x, bullet.y, isCrit ? '#f1c40f' : '#fff');
                             
@@ -316,7 +445,14 @@ export class Engine {
         for (let i = this.xpOrbs.length - 1; i >= 0; i--) {
             const orb = this.xpOrbs[i];
             if (orb.update(this.player, magnetActive)) {
-                if (this.player.addXP(orb.value)) {
+                orb.sizePop = 15; // Trigger the pop
+                
+                let gain = orb.value;
+                if (this.player.totalXp > 10000) {
+                    gain *= 10;
+                }
+
+                if (this.player.addXP(gain)) {
                     this.triggerLevelUp();
                 }
             }
@@ -334,8 +470,10 @@ export class Engine {
         this.enemies.forEach(e => {
             if (e.isDead && !e.dropsSpawned) {
                 e.dropsSpawned = true;
-                this.screenShake = Math.max(this.screenShake, 3);
-                this.spawnHitParticles(e.x, e.y, CONFIG.COLORS.ZOMBIE, 10);
+                this.screenShake = Math.max(this.screenShake, 5);
+                this.hitStop = 1; // 1 frame stop on kill feels great
+                
+                for(let i=0; i<10; i++) this.particles.push(new BloodParticle(e.x, e.y));
                 
                 const cfg = CONFIG.ENEMY[e.type.toUpperCase()] || CONFIG.ENEMY.ZOMBIE;
                 this.player.energy = Math.min(this.player.maxEnergy, this.player.energy + cfg.ENERGY_DROP);
@@ -378,9 +516,15 @@ export class Engine {
                 }
 
                 const xpRange = cfg.XP_MAX - cfg.XP_BASE;
-                const totalXP = Math.floor(cfg.XP_BASE + (e.level - 1) * (xpRange / 7));
-                
+                let totalXP = Math.floor(cfg.XP_BASE + (e.level - 1) * (xpRange / 7));
+
+                // 10x XP Mechanic
+                if (this.player.totalXp > 10000) {
+                    totalXP *= 10;
+                }
+
                 // XP OPTIMIZATION: Spawn fewer orbs with higher values if total XP is high
+
                 const maxOrbsPerKill = 10;
                 const orbValue = Math.max(1, Math.ceil(totalXP / maxOrbsPerKill));
                 const orbCount = Math.ceil(totalXP / orbValue);
@@ -437,6 +581,7 @@ export class Engine {
         this.isPaused = true;
         this.pauseStartTime = Date.now();
         this.screenShake = 15;
+        this.damageNumbers.push(new DamageNumber(this.player.x, this.player.y - 60, 'LEVEL UP!', true));
         if (this.player.godMode) this.player.hp = this.player.maxHp;
         const screen = document.getElementById('level-up-screen');
         const list = document.getElementById('upgrade-list');
@@ -564,6 +709,13 @@ export class Engine {
         this.particles.forEach(p => p.draw(this.ctx, this.camera));
         this.damageNumbers.forEach(d => d.draw(this.ctx, this.camera));
         this.ctx.restore();
+
+        // Hit Flash (Red overlay when player hit)
+        if (this.playerHitFlash > 0) {
+            this.ctx.fillStyle = `rgba(231, 76, 60, ${this.playerHitFlash * 0.3})`;
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            this.playerHitFlash *= 0.9;
+        }
 
         if (this.nukeFlash > 0) {
             this.ctx.fillStyle = `rgba(255, 255, 255, ${this.nukeFlash})`;

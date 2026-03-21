@@ -1,3 +1,7 @@
+* {
+    box-sizing: border-box;
+}
+
 body {
     margin: 0;
     padding: 0;
@@ -11,6 +15,7 @@ body {
     position: relative;
     width: 100vw;
     height: 100vh;
+    height: 100svh; /* More reliable on mobile */
 }
 
 #game-canvas { display: block; }
@@ -25,6 +30,7 @@ body {
     flex-direction: column;
     gap: 10px;
     z-index: 50;
+    transform-origin: top left; /* For potential scaling */
 }
 
 .bar-container {
@@ -148,6 +154,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
+    transform-origin: bottom left;
 }
 
 #joystick-base {
@@ -180,6 +187,7 @@ body {
     flex-direction: column;
     gap: 20px;
     align-items: flex-end;
+    transform-origin: bottom right;
 }
 
 .mobile-btn-row {
@@ -217,23 +225,24 @@ body {
 }
 
 /* Mobile Adjustments */
-@media (max-width: 850px) {
+@media (max-width: 850px), (max-height: 500px) {
     #hud {
-        left: 10px;
-        top: 10px;
-        right: 10px;
-        gap: 5px;
+        left: 5px;
+        top: 5px;
+        right: 5px;
+        transform: scale(0.6);
+        gap: 2px;
     }
     .bar-container {
-        width: 140px;
+        width: 150px;
         height: 14px;
         border-width: 1px;
     }
-    .bar-label {
-        font-size: 8px;
-    }
     #timer {
-        font-size: 18px;
+        font-size: 24px;
+        right: 0;
+        transform: scale(1.6); /* Counter-scale timer to keep it readable */
+        transform-origin: top right;
     }
     #ability-slots {
         display: none;
@@ -241,44 +250,25 @@ body {
 
     /* Joystick and Buttons Scaling */
     #joystick-container {
-        bottom: 20px;
-        left: 20px;
-        width: 100px;
-        height: 100px;
-    }
-    #joystick-base {
-        width: 100px;
-        height: 100px;
-    }
-    #joystick-stick {
-        width: 40px;
-        height: 40px;
+        bottom: 5px;
+        left: 5px;
+        transform: scale(0.6);
     }
     #mobile-buttons {
-        bottom: 20px;
-        right: 20px;
-        gap: 10px;
-    }
-    .mobile-action-btn {
-        width: 80px;
-        height: 50px;
-        font-size: 12px;
-        border-radius: 25px;
-    }
-    .mobile-ability-btn {
-        width: 45px;
-        height: 45px;
-        font-size: 14px;
+        bottom: 5px;
+        right: 5px;
+        transform: scale(0.6);
     }
 
     /* Main Menu Mobile Fix */
     .menu-scroll-container {
-        padding: 20px 0;
+        padding: 10px 0;
+        height: 100svh;
     }
     .menu-content.split-layout {
         flex-direction: column;
-        gap: 20px;
-        width: 95%;
+        gap: 5px;
+        width: 98%;
         padding-bottom: 20px;
         min-height: auto;
     }
@@ -287,85 +277,87 @@ body {
         flex: none;
     }
     .game-title { 
-        font-size: 40px; 
-        letter-spacing: 5px; 
+        font-size: 28px; 
+        letter-spacing: 2px; 
     }
     .game-subtitle { 
-        font-size: 10px; 
-        letter-spacing: 4px; 
-        margin-bottom: 20px;
+        font-size: 8px; 
+        letter-spacing: 2px; 
+        margin-bottom: 5px;
     }
     .deployment-box {
-        padding: 20px;
-        width: 100%;
-        box-sizing: border-box;
+        padding: 10px;
+        border-radius: 10px;
     }
     .character-preview-box {
-        padding: 10px;
-        gap: 10px;
-    }
-    #character-display {
-        width: 100px;
-        height: 100px;
-    }
-    .glow-button { 
-        padding: 10px 25px; 
-        font-size: 16px; 
-    }
-    .difficulty-options {
-        flex-wrap: wrap;
-        justify-content: center;
+        padding: 5px;
         gap: 5px;
     }
+    #character-display {
+        width: 60px;
+        height: 60px;
+    }
+    .glow-button { 
+        padding: 6px 15px; 
+        font-size: 12px; 
+    }
+    .difficulty-options {
+        gap: 3px;
+        margin-bottom: 5px;
+    }
     .diff-btn {
-        padding: 4px 8px;
+        padding: 2px 5px;
+        font-size: 7px;
+    }
+    .section-label {
         font-size: 9px;
+        margin-bottom: 5px;
+    }
+    #char-name {
+        font-size: 14px;
+        margin-top: 5px;
     }
 
     /* Modals Mobile Fix */
     .modal {
-        padding: 15px;
-        width: 95%;
-        max-height: 90vh;
-        overflow-y: auto;
-        box-sizing: border-box;
+        padding: 8px;
+        width: 98%;
+        max-height: 98svh;
+        transform: scale(0.85); /* Global modal scale down */
     }
-    .modal h1 { font-size: 24px; }
-    .death-modal h1 { font-size: 48px; }
+    .modal h1 { font-size: 16px; }
+    .death-modal h1 { font-size: 28px; }
     .stats-grid {
-        grid-template-columns: 1fr;
-        gap: 0;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0 8px;
     }
     .stat-item {
-        padding: 4px 0;
-        font-size: 11px;
+        padding: 1px 0;
+        font-size: 8px;
     }
     #upgrade-list {
-        grid-template-columns: 1fr;
-        gap: 8px;
-        margin-top: 20px;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 5px;
+        margin-top: 5px;
     }
     .upgrade-card {
-        padding: 10px;
-        flex-direction: row;
-        text-align: left;
-        gap: 10px;
+        padding: 6px;
+        gap: 6px;
     }
-    .upgrade-icon { font-size: 24px; }
-    .upgrade-name { font-size: 14px; }
-    .upgrade-desc { font-size: 10px; }
+    .upgrade-icon { font-size: 20px; }
+    .upgrade-name { font-size: 11px; }
+    .upgrade-desc { font-size: 8px; }
     
     .story-section {
-        padding: 30px 0;
-        margin-top: 40px;
+        padding: 15px 0;
+        margin-top: 20px;
     }
     .story-content {
-        font-size: 12px;
-        line-height: 1.5;
+        font-size: 10px;
     }
     .story-title {
-        font-size: 20px;
-        margin-bottom: 20px;
+        font-size: 14px;
+        margin-bottom: 10px;
     }
 }
 
@@ -773,3 +765,213 @@ hr {
     border-top: 1px solid rgba(255,255,255,0.1);
     margin: 20px 0;
 }
+
+/* AUTH SECTION */
+.menu-top-right {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 200;
+}
+
+.auth-nav-btn {
+    background: rgba(0,0,0,0.8);
+    border: 2px solid #3498db;
+    color: #3498db;
+    padding: 8px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 900;
+    font-size: 12px;
+    letter-spacing: 2px;
+    transition: all 0.3s;
+    backdrop-filter: blur(5px);
+}
+
+.auth-nav-btn:hover {
+    background: #3498db;
+    color: white;
+    box-shadow: 0 0 20px rgba(52, 152, 219, 0.4);
+}
+
+.auth-modal-box {
+    width: 360px;
+    background: #111;
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 40px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.9);
+    position: relative;
+}
+
+.auth-title {
+    margin-top: 0;
+    font-size: 24px;
+    letter-spacing: 4px;
+    text-align: center;
+    color: #3498db;
+}
+
+.auth-modal-box p {
+    text-align: center;
+    font-size: 13px;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 25px;
+}
+
+.auth-divider {
+    text-align: center;
+    margin: 20px 0;
+    position: relative;
+    font-size: 10px;
+    color: rgba(255,255,255,0.2);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.auth-divider::before, .auth-divider::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    width: 35%;
+    height: 1px;
+    background: rgba(255,255,255,0.1);
+}
+
+.auth-divider::before { left: 0; }
+.auth-divider::after { right: 0; }
+
+.google-btn {
+    background: white !important;
+    color: #444 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    margin: 0 auto;
+    border: none;
+    box-sizing: border-box;
+}
+
+.google-btn img {
+    width: 18px;
+    height: 18px;
+}
+
+.google-btn:hover {
+    background: #f1f1f1 !important;
+    transform: translateY(-2px);
+}
+
+.auth-input {
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: white;
+    padding: 12px;
+    margin-bottom: 12px;
+    border-radius: 4px;
+    box-sizing: border-box;
+    font-size: 14px;
+    transition: all 0.3s;
+}
+
+.auth-input:focus {
+    outline: none;
+    border-color: #3498db;
+    background: rgba(255,255,255,0.1);
+}
+
+.auth-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 5px;
+}
+
+.auth-btn {
+    flex: 1;
+    background: #2c3e50;
+    border: none;
+    color: white;
+    padding: 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 11px;
+    letter-spacing: 1px;
+    transition: all 0.3s;
+}
+
+.auth-btn:hover {
+    background: #34495e;
+    transform: translateY(-2px);
+}
+
+.logout-btn {
+    background: #c0392b;
+    width: 100%;
+    margin-top: 10px;
+}
+
+.logout-btn:hover {
+    background: #e74c3c;
+}
+
+.close-btn {
+    margin-top: 30px;
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,0.3);
+    width: 100%;
+    padding: 10px;
+    cursor: pointer;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    transition: all 0.3s;
+}
+
+.close-btn:hover {
+    color: white;
+}
+
+.auth-msg {
+    margin-top: 15px;
+    font-size: 11px;
+    text-align: center;
+    min-height: 16px;
+    font-weight: bold;
+}
+
+#user-info-box {
+    background: rgba(52, 152, 219, 0.05);
+    padding: 25px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    text-align: center;
+    border: 1px solid rgba(52, 152, 219, 0.1);
+}
+
+.profile-label {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: rgba(52, 152, 219, 0.5);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+}
+
+#user-email {
+    font-size: 16px;
+    font-weight: bold;
+    color: white;
+    word-break: break-all;
+    margin-bottom: 12px;
+}
+
+.profile-status {
+    font-size: 9px;
+    color: #2ecc71;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+

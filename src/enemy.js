@@ -39,6 +39,7 @@ export class Enemy {
         this.isExploding = false;
         this.fuseTimer = 0;
         this.dropsSpawned = false;
+        this.scalePop = 0;
     }
 
     updateStats() {
@@ -127,9 +128,15 @@ export class Enemy {
 
         this.frame += 0.1;
         if (this.isHit) this.hitTimer++;
-        if (this.hitTimer > 6) {
+        if (this.hitTimer > 10) { // Increased for better flash visibility
             this.isHit = false;
             this.hitTimer = 0;
+        }
+
+        // Juice: Scale Pop decay
+        if (this.scalePop > 0) {
+            this.scalePop *= 0.8;
+            if (this.scalePop < 0.01) this.scalePop = 0;
         }
 
         if (this.hp <= 0 && !this.isDead) {
@@ -151,6 +158,8 @@ export class Enemy {
         this.hp -= amount;
         this.isHit = true;
         this.hitTimer = 0;
+        // Visual 'pop' when hit
+        this.scalePop = 0.2;
     }
 
     draw(ctx, camera) {
@@ -167,7 +176,7 @@ export class Enemy {
         }
 
         let mainColor = this.type === 'zombie' ? CONFIG.COLORS.ZOMBIE : (this.type === 'skeleton' ? CONFIG.COLORS.SKELETON : CONFIG.COLORS.LADYBUG);
-        let scale = 1 + (this.level - 1) * 0.1;
+        let scale = (1 + (this.level - 1) * 0.1) * (1 + this.scalePop);
         
         // Exploder flashing
         if (this.isExploding) {
