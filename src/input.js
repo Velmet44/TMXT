@@ -218,6 +218,10 @@ if (startBtn) {
         keys.selectedCharIndex = currentCharIndex;
         // Update isMobile check on start to be sure
         keys.isMobile = checkIsMobile();
+        if (keys.isMobile && mainMenu) {
+            mainMenu.style.transform = 'scale(0.9)';
+            mainMenu.style.transformOrigin = 'top center';
+        }
         
         if (keys.isMobile) {
             requestMobileOptimizations();

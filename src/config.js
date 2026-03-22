@@ -140,6 +140,9 @@ export const CONFIG = {
         XP_GROWTH_MULT: 1.3,
         XP_GROWTH_BASE: 10
     },
+    PARTICLES: {
+        MOBILE_MULT: 0.5
+    },
     ABILITIES: {
         CHARGE: { MIN_LEVEL: 5 },
         INVINCIBLE: { MIN_LEVEL: 8 },

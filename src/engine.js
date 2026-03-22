@@ -34,6 +34,7 @@ export class Engine {
         this.hitStop = 0;
         this.playerHitFlash = 0;
         this.zoomPulse = 0;
+        this.particleMult = keys.isMobile ? CONFIG.PARTICLES.MOBILE_MULT : 1;
         
         soundManager.playBGM('menu');
         this.tileSize = keys.isMobile ? CONFIG.TILE_SIZE * 2 : CONFIG.TILE_SIZE;
@@ -288,7 +289,8 @@ export class Engine {
                         this.screenShake = Math.max(this.screenShake, 15);
                         this.playerHitFlash = 1.0;
                         soundManager.playSFX('hurt');
-                        for(let i=0; i<8; i++) this.particles.push(new BloodParticle(this.player.x, this.player.y));
+                        const hits = Math.max(1, Math.ceil(8 * this.particleMult));
+                        for(let i=0; i<hits; i++) this.particles.push(new BloodParticle(this.player.x, this.player.y));
                     }
                     b.active = false;
                 }
@@ -306,7 +308,8 @@ export class Engine {
                             this.screenShake = Math.max(this.screenShake, 25);
                             this.playerHitFlash = 1.0;
                             this.hitStop = 5;
-                            for(let i=0; i<15; i++) this.particles.push(new BloodParticle(this.player.x, this.player.y));
+                            const hits = Math.max(1, Math.ceil(15 * this.particleMult));
+                            for(let i=0; i<hits; i++) this.particles.push(new BloodParticle(this.player.x, this.player.y));
                         }
                     }
                 } else {
@@ -415,7 +418,8 @@ export class Engine {
                 this.screenShake = Math.max(this.screenShake, 5);
                 this.hitStop = 1;
                 soundManager.playSFX('kick');
-                for(let i=0; i<10; i++) this.particles.push(new BloodParticle(e.x, e.y));
+                const blood = Math.max(1, Math.ceil(10 * this.particleMult));
+                for(let i=0; i<blood; i++) this.particles.push(new BloodParticle(e.x, e.y));
                 const cfg = CONFIG.ENEMY[e.type.toUpperCase()] || CONFIG.ENEMY.ZOMBIE;
                 this.player.energy = Math.min(this.player.maxEnergy, this.player.energy + cfg.ENERGY_DROP);
 
@@ -484,7 +488,7 @@ export class Engine {
     }
 
     spawnHitParticles(x, y, color, count = 5) {
-        const finalCount = keys.isMobile ? Math.ceil(count / 2) : count;
+        const finalCount = Math.max(1, Math.ceil(count * this.particleMult));
         for(let i=0; i<finalCount; i++) this.particles.push(new Particle(x, y, color));
     }
 
@@ -633,6 +637,20 @@ export class Engine {
         // Ability 4 remains placeholder
         document.getElementById(`ability-4`).classList.add('locked');
         document.getElementById(`ability-cooldown-4`).style.height = '100%';
+
+        // Mobile buttons labels/state
+        const mobileBtn1 = document.getElementById('btn-ability-1');
+        const mobileBtn2 = document.getElementById('btn-ability-2');
+        const mobileBtn3 = document.getElementById('btn-ability-3');
+        if (mobileBtn1) mobileBtn1.innerText = 'CHARGE';
+        if (mobileBtn2) {
+            mobileBtn2.innerText = 'INVINCUS';
+            mobileBtn2.disabled = p.level < CONFIG.ABILITIES.INVINCIBLE.MIN_LEVEL;
+        }
+        if (mobileBtn3) {
+            mobileBtn3.innerText = p.nukeCharges > 0 ? `NUKE (${p.nukeCharges})` : 'NUKE';
+            mobileBtn3.disabled = !(p.level >= CONFIG.ABILITIES.NUKE.MIN_LEVEL && p.nukeCharges > 0);
+        }
     }
 
     spawnEnemy(difficulty, type = 'zombie') {
