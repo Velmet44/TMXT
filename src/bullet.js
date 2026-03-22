@@ -25,9 +25,12 @@ export class Bullet {
         this.active = true;
         this.angle = Math.atan2(dy, dx);
         this.frame = Math.random() * 10;
+        this.trail = [];
     }
 
     update() {
+        this.trail.push({ x: this.x, y: this.y });
+        if (this.trail.length > 5) this.trail.shift();
         this.x += this.vx;
         this.y += this.vy;
         this.frame += 0.2;
@@ -36,6 +39,23 @@ export class Bullet {
     draw(ctx, camera) {
         const sx = this.x - camera.x;
         const sy = this.y - camera.y;
+
+        // Draw trail in world space (no rotation) to avoid stray lines
+        if (!this.isEnemy && this.trail.length > 1) {
+            ctx.save();
+            ctx.globalAlpha = 0.35;
+            ctx.strokeStyle = CONFIG.COLORS.BULLET;
+            ctx.lineWidth = Math.max(1, this.size / 2);
+            ctx.beginPath();
+            this.trail.forEach((p, i) => {
+                const tx = p.x - camera.x;
+                const ty = p.y - camera.y;
+                if (i === 0) ctx.moveTo(tx, ty);
+                else ctx.lineTo(tx, ty);
+            });
+            ctx.stroke();
+            ctx.restore();
+        }
 
         ctx.save();
         ctx.translate(sx, sy);

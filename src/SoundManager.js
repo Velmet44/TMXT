@@ -9,7 +9,7 @@ export class SoundManager {
         this.sfxVolume = 0.5;
         this.wasPlayingBeforeHide = false;
         
-        this.sfxFiles = ['shoot', 'hit', 'xp', 'lvlup', 'dash', 'kick', 'hurt', 'pickup', 'death', 'start'];
+        this.sfxFiles = ['shoot', 'hit', 'xp', 'lvlup', 'dash', 'kick', 'hurt', 'pickup', 'death', 'start', 'crit', 'magnet', 'nuke', 'charge', 'invincible'];
 
         // Auto-pause when tab is hidden
         document.addEventListener('visibilitychange', () => {
@@ -65,7 +65,7 @@ export class SoundManager {
     }
 
     playSFX(name, pitchVar = 0.1) {
-        if (!this.ctx || !this.sounds[name]) return;
+        if (!this.ctx || !this.sounds[name]) return false;
         if (this.ctx.state === 'suspended') this.ctx.resume();
 
         const source = this.ctx.createBufferSource();
@@ -82,6 +82,29 @@ export class SoundManager {
         source.connect(gain);
         gain.connect(this.ctx.destination);
         source.start(0);
+        return true;
+    }
+
+    // Lightweight synthesized blips for events without wav assets
+    playSynth(name) {
+        if (!this.ctx) return;
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const now = this.ctx.currentTime;
+        const tones = {
+            crit: 880,
+            magnet: 660,
+            nuke: 120
+        };
+        osc.frequency.value = tones[name] || 500;
+        gain.gain.setValueAtTime(this.sfxVolume * 0.6, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+        osc.type = name === 'nuke' ? 'sawtooth' : 'triangle';
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.3);
     }
 
     async playBGM(name) {

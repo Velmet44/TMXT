@@ -1,6 +1,6 @@
 import { CONFIG, UPGRADES } from './config.js';
 import { Bullet } from './bullet.js';
-import { XPOrb, Particle, DamageNumber, SlashParticle, BloodParticle } from './utils.js';
+import { XPOrb, Particle, DamageNumber, SlashParticle, BloodParticle, ItemLabel } from './utils.js';
 import { Item } from './item.js';
 import { Enemy } from './enemy.js';
 import { keys } from './input.js';
@@ -16,26 +16,26 @@ export class Engine {
         this.enemies = [];
         this.bullets = [];
         this.xpOrbs = [];
-        this.items = []; // New items array
+        this.items = []; 
         this.particles = [];
         this.damageNumbers = [];
+        this.itemLabels = [];
         this.startTime = Date.now();
-        this.elapsedTime = 0; // Cumulative time in seconds
+        this.elapsedTime = 0; 
         this.pauseStartTime = 0;
         this.lastSpawn = 0;
         this.isPaused = false;
         this.isStarted = false;
         this.difficulty = null;
         this.wasEscapeDown = false;
+        this.wasAbility3Down = false;
         this.screenShake = 0;
         this.nukeFlash = 0;
         this.hitStop = 0;
         this.playerHitFlash = 0;
+        this.zoomPulse = 0;
         
-        // Start Menu BGM
         soundManager.playBGM('menu');
-
-        // Optimization: Larger tiles on mobile to reduce draw calls
         this.tileSize = keys.isMobile ? CONFIG.TILE_SIZE * 2 : CONFIG.TILE_SIZE;
 
         this.resize();
@@ -44,7 +44,6 @@ export class Engine {
         this.initAuthUI();
         window.addEventListener('resize', () => this.resize());
         
-        // Auto-pause game when tab is hidden
         document.addEventListener('visibilitychange', () => {
             if (document.hidden && this.isStarted && !this.isPaused && !this.player.isDead) {
                 this.togglePause();
@@ -54,18 +53,10 @@ export class Engine {
 
     initUI() {
         document.getElementById('resume-btn').onclick = () => this.togglePause();
-        
-        // Volume Controls
         const bgmSlider = document.getElementById('bgm-volume');
         const sfxSlider = document.getElementById('sfx-volume');
-
-        bgmSlider.oninput = (e) => {
-            soundManager.setVolume('bgm', parseFloat(e.target.value));
-        };
-
-        sfxSlider.oninput = (e) => {
-            soundManager.setVolume('sfx', parseFloat(e.target.value));
-        };
+        bgmSlider.oninput = (e) => soundManager.setVolume('bgm', parseFloat(e.target.value));
+        sfxSlider.oninput = (e) => soundManager.setVolume('sfx', parseFloat(e.target.value));
         
         const startBtn = document.getElementById('start-btn');
         if (startBtn) {
@@ -73,22 +64,14 @@ export class Engine {
                 this.isStarted = true;
                 this.startTime = Date.now();
                 this.lastSpawn = Date.now();
-                
-                // Set difficulty from keys
                 const diffKey = keys.currentDifficulty || 'NORMAL';
                 this.difficulty = CONFIG.DIFFICULTIES[diffKey];
                 this.player.difficulty = this.difficulty;
                 this.player.setCharacter(keys.selectedCharIndex || 1);
-                
-                // Play Game BGM
                 soundManager.playBGM('game');
                 soundManager.playSFX('start');
-
-                // Adjust Player HP
                 this.player.maxHp = Math.round(this.player.maxHp * this.difficulty.hpMult);
                 this.player.hp = this.player.maxHp;
-
-                // Auto Fullscreen on mobile
                 if (keys.isMobile && document.documentElement.requestFullscreen) {
                     document.documentElement.requestFullscreen().catch(() => {});
                 }
@@ -113,10 +96,7 @@ export class Engine {
             msgDiv.style.color = isError ? '#e74c3c' : '#2ecc71';
         };
 
-        authNavBtn.onclick = () => {
-            authModal.classList.remove('hidden');
-        };
-
+        authNavBtn.onclick = () => authModal.classList.remove('hidden');
         closeAuthBtn.onclick = () => {
             authModal.classList.add('hidden');
             updateMessage('');
@@ -132,7 +112,6 @@ export class Engine {
             const email = emailInput.value;
             const pass = passInput.value;
             if (!email || !pass) return updateMessage('Enter email and password', true);
-            
             updateMessage('Logging in...');
             const { data, error } = await login(email, pass);
             if (error) updateMessage(error.message, true);
@@ -146,7 +125,6 @@ export class Engine {
             const email = emailInput.value;
             const pass = passInput.value;
             if (!email || !pass) return updateMessage('Enter email and password', true);
-
             updateMessage('Signing up...');
             const { data, error } = await signUp(email, pass);
             if (error) updateMessage(error.message, true);
@@ -163,12 +141,7 @@ export class Engine {
             }
         };
 
-        // Listen for auth state changes
-        supabase.auth.onAuthStateChange((event, session) => {
-            this.updateAuthUI(session);
-        });
-
-        // Initial check
+        supabase.auth.onAuthStateChange((event, session) => this.updateAuthUI(session));
         const session = await getSession();
         this.updateAuthUI(session);
     }
@@ -200,14 +173,11 @@ export class Engine {
             this.pauseStartTime = Date.now();
             menu.classList.remove('hidden');
             this.updateStatsGrid('pause-stats');
-            
-            // Show time survived in pause menu
             const seconds = Math.floor(this.elapsedTime % 60);
             const minutes = Math.floor(this.elapsedTime / 60);
             const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             pauseTitle.innerText = `PAUSED - ${timeStr}`;
         } else {
-            // Adjust startTime to ignore the duration spent in pause
             if (this.pauseStartTime > 0) {
                 this.startTime += (Date.now() - this.pauseStartTime);
                 this.pauseStartTime = 0;
@@ -224,8 +194,6 @@ export class Engine {
 
     update() {
         if (!this.isStarted) return;
-
-        // Hit Stop: Momentarily freeze game for impact feel
         if (this.hitStop > 0) {
             this.hitStop--;
             return;
@@ -235,10 +203,9 @@ export class Engine {
             this.togglePause();
         }
         this.wasEscapeDown = keys.escape;
+        this.wasAbility3Down = keys.c;
 
         if (this.isPaused || this.player.isDead) {
-            // ... (rest of the death/pause handling)
-
             if (this.player.isDead) {
                 const screen = document.getElementById('death-screen');
                 if (screen.classList.contains('hidden')) {
@@ -255,10 +222,15 @@ export class Engine {
         this.player.update();
         if (this.player.isDashing) this.screenShake = Math.max(this.screenShake, 5);
         if (this.player.isChargedUp && Math.random() < 0.1) this.screenShake = Math.max(this.screenShake, 2);
+        if (this.player.isInvincible) this.screenShake = Math.max(this.screenShake, 3);
+        // Ability 3 (Nuke) activation: level gate 10 and requires stored charge
+        if (keys.c && !this.wasAbility3Down && this.player.level >= CONFIG.ABILITIES.NUKE.MIN_LEVEL && this.player.nukeCharges > 0) {
+            this.activateNuke();
+        }
+        this.wasAbility3Down = keys.c;
 
         this.updateHUD();
 
-        // Smoother camera with zoom consideration
         const targetCamX = this.player.x - (this.canvas.width / 2) / this.zoom;
         const targetCamY = this.player.y - (this.canvas.height / 2) / this.zoom;
         this.camera.x += (targetCamX - this.camera.x) * CONFIG.PLAYER.LERP;
@@ -268,21 +240,16 @@ export class Engine {
             this.screenShake *= 0.9;
             if (this.screenShake < 0.1) this.screenShake = 0;
         }
+        if (this.zoomPulse > 0) this.zoomPulse *= 0.9;
 
-        if (this.nukeFlash > 0) {
-            this.nukeFlash -= 0.05;
-        }
+        if (this.nukeFlash > 0) this.nukeFlash -= 0.05;
 
         const now = Date.now();
-        if (!this.isPaused) {
-            this.elapsedTime = (now - this.startTime) / 1000;
-        }
+        if (!this.isPaused) this.elapsedTime = (now - this.startTime) / 1000;
         const elapsedTime = this.elapsedTime;
         
-        // Ramp difficulty every full minute using config multiplier
         const minutesElapsed = Math.floor(elapsedTime / 60);
         const diffMultiplier = Math.pow(CONFIG.SPAWN_SCALING.PER_MINUTE_MULT, minutesElapsed);
-
         const globalDifficulty = Math.min(CONFIG.ENEMY.DEFAULT.MAX_LEVEL, Math.floor(1 + elapsedTime / 30)); 
         const spawnRate = Math.max(
             CONFIG.SPAWN_SCALING.MIN_SPAWN_INTERVAL,
@@ -290,7 +257,6 @@ export class Engine {
         );
 
         if (now - this.lastSpawn > spawnRate) {
-            // Data-driven enemy selection based on weight and time
             const availableTypes = [];
             for (const [type, cfg] of Object.entries(CONFIG.ENEMY)) {
                 if (type === 'DEFAULT') continue;
@@ -298,11 +264,9 @@ export class Engine {
                     availableTypes.push({ type: type.toLowerCase(), weight: cfg.SPAWN_WEIGHT });
                 }
             }
-
             const totalWeight = availableTypes.reduce((sum, t) => sum + t.weight, 0);
             let roll = Math.random() * totalWeight;
             let selectedType = 'zombie';
-            
             for (const t of availableTypes) {
                 if (roll < t.weight) {
                     selectedType = t.type;
@@ -310,7 +274,6 @@ export class Engine {
                 }
                 roll -= t.weight;
             }
-
             this.spawnEnemy(globalDifficulty, selectedType);
             this.lastSpawn = now;
         }
@@ -320,19 +283,14 @@ export class Engine {
             if (b.isEnemy && b.active) {
                 const dx = b.x - this.player.x;
                 const dy = b.y - this.player.y;
-                const distSq = dx * dx + dy * dy;
-                const colDist = this.player.size / 2 + b.size;
-                if (distSq < colDist * colDist) {
-                    let dmg = b.damage;
-                    if (this.player.armor) dmg *= (1 - this.player.armor);
-                    this.player.hp -= dmg;
-                    this.screenShake = Math.max(this.screenShake, 15);
-                    this.playerHitFlash = 1.0;
-                    soundManager.playSFX('hurt');
-                        
+                if (dx * dx + dy * dy < (this.player.size / 2 + b.size) ** 2) {
+                    if (this.player.takeDamage(b.damage)) {
+                        this.screenShake = Math.max(this.screenShake, 15);
+                        this.playerHitFlash = 1.0;
+                        soundManager.playSFX('hurt');
+                        for(let i=0; i<8; i++) this.particles.push(new BloodParticle(this.player.x, this.player.y));
+                    }
                     b.active = false;
-                    for(let i=0; i<8; i++) this.particles.push(new BloodParticle(this.player.x, this.player.y));
-
                 }
             }
         });
@@ -341,20 +299,15 @@ export class Engine {
         this.enemies.forEach(enemy => {
             enemy.update(this.player, this.camera, this.canvas, (skel, target) => {
                 if (skel.type === 'exploder') {
-                    // Exploder explosion damage
                     const dx = target.x - skel.x;
                     const dy = target.y - skel.y;
-                    const distSq = dx * dx + dy * dy;
-                    const range = 80; // Explosion radius
-                    if (distSq < range * range) {
-                        let dmg = skel.damage;
-                        if (this.player.armor) dmg *= (1 - this.player.armor);
-                        this.player.hp -= dmg;
-                        this.screenShake = Math.max(this.screenShake, 25);
-                        this.playerHitFlash = 1.0;
-                        
-                        this.hitStop = 5; // Freeze for 5 frames on big hit
-                        for(let i=0; i<15; i++) this.particles.push(new BloodParticle(this.player.x, this.player.y));
+                    if (dx * dx + dy * dy < 80 * 80) {
+                        if (this.player.takeDamage(skel.damage)) {
+                            this.screenShake = Math.max(this.screenShake, 25);
+                            this.playerHitFlash = 1.0;
+                            this.hitStop = 5;
+                            for(let i=0; i<15; i++) this.particles.push(new BloodParticle(this.player.x, this.player.y));
+                        }
                     }
                 } else {
                     this.bullets.push(new Bullet(skel.x, skel.y, target.x, target.y, true));
@@ -364,20 +317,15 @@ export class Engine {
             if (!enemy.isDead) {
                 const dx = this.player.x - enemy.x;
                 const dy = this.player.y - enemy.y;
-                const distSq = dx * dx + dy * dy;
-                const colDist = (this.player.size + enemy.size) / 2;
-                
-                if (distSq < colDist * colDist) {
+                if (dx * dx + dy * dy < ((this.player.size + enemy.size) / 2) ** 2) {
                     if (enemy.canAttack()) {
-                        let dmg = enemy.damage;
-                        if (this.player.armor) dmg *= (1 - this.player.armor);
-                        this.player.hp -= dmg;
-                        enemy.resetAttackCooldown();
-                        this.screenShake = Math.max(this.screenShake, 10);
-                        this.playerHitFlash = 1.0;
-                        
-                        this.hitStop = 2;
-                        for(let i=0; i<5; i++) this.particles.push(new BloodParticle(this.player.x, this.player.y));
+                        if (this.player.takeDamage(enemy.damage)) {
+                            enemy.resetAttackCooldown();
+                            this.screenShake = Math.max(this.screenShake, 10);
+                            this.playerHitFlash = 1.0;
+                            this.hitStop = 2;
+                            for(let i=0; i<5; i++) this.particles.push(new BloodParticle(this.player.x, this.player.y));
+                        }
                     }
                 }
 
@@ -385,25 +333,22 @@ export class Engine {
                     if (bullet.active && !bullet.isEnemy) {
                         const bdx = bullet.x - enemy.x;
                         const bdy = bullet.y - enemy.y;
-                        const bdistSq = bdx * bdx + bdy * bdy;
-                        const bcolDist = enemy.size / 2 + bullet.size;
-                        if (bdistSq < bcolDist * bcolDist) {
+                        if (bdx * bdx + bdy * bdy < (enemy.size / 2 + bullet.size) ** 2) {
                             let damage = this.player.getCurrentDamage();
                             const isCrit = this.player.critChance && Math.random() < this.player.critChance;
                             if (isCrit) damage *= 2;
-                            
                             if (isCrit) {
                                 this.hitStop = 2;
                                 this.screenShake = Math.max(this.screenShake, 15);
-                                soundManager.playSFX('hit', 0.2); // Higher pitch for crit
+                                if (!soundManager.playSFX('crit', 0.05)) soundManager.playSynth('crit');
+                                soundManager.playSFX('hit', 0.15);
+                                this.zoomPulse = Math.min(0.2, this.zoomPulse + 0.05);
                             } else {
                                 soundManager.playSFX('hit', 0.05);
                             }
                             enemy.takeDamage(damage);
-
                             this.damageNumbers.push(new DamageNumber(enemy.x, enemy.y, damage, isCrit));
                             this.spawnHitParticles(bullet.x, bullet.y, isCrit ? '#f1c40f' : '#fff');
-                            
                             bullet.active = false;
                             if (this.player.lifesteal) {
                                 this.player.hp = Math.min(this.player.maxHp, this.player.hp + damage * this.player.lifesteal);
@@ -414,168 +359,107 @@ export class Engine {
             }
         });
 
-        // Items Logic
         const magnetActive = this.player.itemEffects.magnetEndTime > Date.now();
-        
         for (let i = this.items.length - 1; i >= 0; i--) {
             const item = this.items[i];
-            // Check pickup (returns true if picked up)
             if (item.update(this.player, magnetActive)) {
                 soundManager.playSFX('pickup');
-                
-                // Apply Effect
                 const type = item.type;
+                let labelText = '';
                 switch(type.id) {
                     case 'magnet':
                         this.player.itemEffects.magnetEndTime = Date.now() + type.duration;
-                        break;
+                        if (!soundManager.playSFX('magnet', 0.05)) soundManager.playSynth('magnet');
+                        labelText = 'MAGNET'; break;
                     case 'health':
                         this.player.hp = Math.min(this.player.maxHp, this.player.hp + type.value);
-                        this.damageNumbers.push(new DamageNumber(this.player.x, this.player.y - 40, '+HP', true));
-                        break;
+                        labelText = '+HP'; break;
                     case 'nuke':
-                        this.enemies.forEach(e => {
-                            if (!e.isDead) {
-                                e.takeDamage(9999);
-                                // Slicing effect
-                                for(let j=0; j<3; j++) {
-                                    this.particles.push(new SlashParticle(e.x, e.y, '#fff'));
-                                }
-                                this.damageNumbers.push(new DamageNumber(e.x, e.y, 'NUKE', true));
-                            }
-                        });
-                        this.screenShake = 40;
-                        this.nukeFlash = 1.0;
+        this.player.nukeCharges = Math.min(CONFIG.ABILITIES.NUKE.MAX_CHARGES, (this.player.nukeCharges || 0) + 1);
+                        labelText = 'NUKE READY'; 
                         break;
                     case 'speed':
                         this.player.itemEffects.speedEndTime = Date.now() + type.duration;
-                        break;
+                        labelText = '+SPEED'; break;
                     case 'rapid':
                         this.player.itemEffects.rapidEndTime = Date.now() + type.duration;
-                        break;
+                        labelText = 'RAPID FIRE'; break;
                 }
-                
-                // Show Floating Text
-                if (type.id !== 'health' && type.id !== 'nuke') {
-                    this.damageNumbers.push(new DamageNumber(this.player.x, this.player.y - 40, type.label, true));
-                }
-
+                this.itemLabels.push(new ItemLabel(this.player.x, this.player.y - 40, labelText, type.color));
                 this.items.splice(i, 1);
-            } else if (!item.active) {
-                // Despawned naturally
-                this.items.splice(i, 1);
-            }
+            } else if (!item.active) this.items.splice(i, 1);
         }
 
-        // XP Optimization: Process orbs with standard for loop (faster than forEach)
         for (let i = this.xpOrbs.length - 1; i >= 0; i--) {
             const orb = this.xpOrbs[i];
             if (orb.update(this.player, magnetActive)) {
-                orb.sizePop = 15; // Trigger the pop
+                orb.sizePop = 15;
                 soundManager.playSFX('xp');
-                
                 let gain = orb.value;
-                if (this.player.totalXp > 10000) {
-                    gain *= 10;
-                }
-
-                if (this.player.addXP(gain)) {
-                    this.triggerLevelUp();
-                }
+                if (this.player.totalXp > 10000) gain *= 10;
+                if (this.player.addXP(gain)) this.triggerLevelUp();
             }
-            if (!orb.active) {
-                this.xpOrbs.splice(i, 1);
-            }
+            if (!orb.active) this.xpOrbs.splice(i, 1);
         }
 
         this.particles.forEach(p => p.update());
         this.particles = this.particles.filter(p => p.life > 0);
-
         this.damageNumbers.forEach(d => d.update());
         this.damageNumbers = this.damageNumbers.filter(d => d.life > 0);
+        this.itemLabels.forEach(l => l.update());
+        this.itemLabels = this.itemLabels.filter(l => l.life > 0);
 
         this.enemies.forEach(e => {
             if (e.isDead && !e.dropsSpawned) {
                 e.dropsSpawned = true;
                 this.screenShake = Math.max(this.screenShake, 5);
-                this.hitStop = 1; // 1 frame stop on kill feels great
+                this.hitStop = 1;
                 soundManager.playSFX('kick');
-                
                 for(let i=0; i<10; i++) this.particles.push(new BloodParticle(e.x, e.y));
-                
                 const cfg = CONFIG.ENEMY[e.type.toUpperCase()] || CONFIG.ENEMY.ZOMBIE;
                 this.player.energy = Math.min(this.player.maxEnergy, this.player.energy + cfg.ENERGY_DROP);
 
-                // ITEM DROP
                 if (Math.random() < CONFIG.ITEMS.DROP_CHANCE) {
-                    // Rule 1: No new item if any powerup is visible on screen
-                    const isAnyItemVisible = this.items.some(item => {
+                    const visibleTypes = new Set();
+                    this.items.forEach(item => {
                         const screenX = item.x - this.camera.x;
                         const screenY = item.y - this.camera.y;
-                        // Approximate visibility check (matching Item.draw)
-                        return screenX > -100 && screenX < this.canvas.width + 100 &&
-                               screenY > -100 && screenY < this.canvas.height + 100;
+                        const onScreen = screenX > -100 && screenX < this.canvas.width + 100 && screenY > -100 && screenY < this.canvas.height + 100;
+                        if (onScreen) visibleTypes.add(item.type.id);
                     });
-
-                    if (!isAnyItemVisible) {
+                    {
                         const types = CONFIG.ITEMS.TYPES;
                         let roll = Math.random();
                         let selectedType = null;
-                        
                         for (const key in types) {
                             const type = types[key];
-                            if (roll < type.chance) {
-                                selectedType = type;
-                                break;
-                            }
+                            if (roll < type.chance) { selectedType = type; break; }
                             roll -= type.chance;
                         }
-                        
                         if (selectedType) {
-                            // Rule 2: No duplicate Nuke anywhere
-                            const isNukeOnGround = selectedType.id === 'nuke' && 
-                                                 this.items.some(i => i.type.id === 'nuke');
-                            
-                            if (!isNukeOnGround) {
+                            if (selectedType.id === 'nuke' && this.player.level < CONFIG.ABILITIES.NUKE.MIN_LEVEL) selectedType = null;
+                            if (selectedType && !visibleTypes.has(selectedType.id)) {
                                 this.items.push(new Item(e.x, e.y, selectedType));
                             }
                         }
                     }
                 }
-
                 const xpRange = cfg.XP_MAX - cfg.XP_BASE;
                 let totalXP = Math.floor(cfg.XP_BASE + (e.level - 1) * (xpRange / 7));
-
-                // 10x XP Mechanic
-                if (this.player.totalXp > 10000) {
-                    totalXP *= 10;
-                }
-
-                // XP OPTIMIZATION: Spawn fewer orbs with higher values if total XP is high
-
-                const maxOrbsPerKill = 10;
-                const orbValue = Math.max(1, Math.ceil(totalXP / maxOrbsPerKill));
+                if (this.player.totalXp > 10000) totalXP *= 10;
+                const orbValue = Math.max(1, Math.ceil(totalXP / 10));
                 const orbCount = Math.ceil(totalXP / orbValue);
-
                 if (this.xpOrbs.length < CONFIG.XP_ORB.MAX_ORBS) {
-                    for (let i = 0; i < orbCount; i++) {
-                        this.xpOrbs.push(new XPOrb(e.x, e.y, orbValue));
-                    }
+                    for (let i = 0; i < orbCount; i++) this.xpOrbs.push(new XPOrb(e.x, e.y, orbValue));
                 }
             }
         });
         this.enemies = this.enemies.filter(e => e.hp !== -999 && (!e.isDead || e.deathTimer < 1));
 
         if (now - this.player.lastAttack > this.player.getCurrentAtkCooldown()) {
-            let targets = this.enemies
-                .filter(e => !e.isDead)
-                .map(e => ({
-                    enemy: e,
-                    distSq: (this.player.x - e.x) ** 2 + (this.player.y - e.y) ** 2
-                }))
-                .filter(t => t.distSq < this.player.atkRange * this.player.atkRange)
-                .sort((a, b) => a.distSq - b.distSq)
-                .slice(0, this.player.projCount);
+            let targets = this.enemies.filter(e => !e.isDead).map(e => ({
+                enemy: e, distSq: (this.player.x - e.x) ** 2 + (this.player.y - e.y) ** 2
+            })).filter(t => t.distSq < this.player.atkRange * this.player.atkRange).sort((a, b) => a.distSq - b.distSq).slice(0, this.player.projCount);
 
             if (targets.length > 0) {
                 const shots = (this.player.multiShotChance && Math.random() < this.player.multiShotChance) ? 2 : 1;
@@ -583,6 +467,7 @@ export class Engine {
                     setTimeout(() => {
                         this.player.attack(targets[0].enemy.x, targets[0].enemy.y);
                         soundManager.playSFX('shoot', 0.1);
+                        this.spawnHitParticles(this.player.x, this.player.y, CONFIG.COLORS.BULLET, 2);
                         this.player.gunRecoil = 10;
                         targets.forEach(t => {
                             const b = new Bullet(this.player.x, this.player.y, t.enemy.x, t.enemy.y);
@@ -593,7 +478,6 @@ export class Engine {
                 }
             }
         }
-
         const seconds = Math.floor(elapsedTime % 60);
         const minutes = Math.floor(elapsedTime / 60);
         document.getElementById('timer').innerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
@@ -601,15 +485,14 @@ export class Engine {
 
     spawnHitParticles(x, y, color, count = 5) {
         const finalCount = keys.isMobile ? Math.ceil(count / 2) : count;
-        for(let i=0; i<finalCount; i++) {
-            this.particles.push(new Particle(x, y, color));
-        }
+        for(let i=0; i<finalCount; i++) this.particles.push(new Particle(x, y, color));
     }
 
     triggerLevelUp() {
         this.isPaused = true;
         this.pauseStartTime = Date.now();
         this.screenShake = 15;
+        this.zoomPulse = Math.min(0.2, this.zoomPulse + 0.08);
         this.damageNumbers.push(new DamageNumber(this.player.x, this.player.y - 60, 'LEVEL UP!', true));
         soundManager.playSFX('lvlup');
         if (this.player.godMode) this.player.hp = this.player.maxHp;
@@ -641,6 +524,20 @@ export class Engine {
         screen.classList.remove('hidden');
     }
 
+    activateNuke() {
+        this.player.nukeCharges -= 1;
+        this.screenShake = CONFIG.ABILITIES.NUKE.SCREEN_SHAKE;
+        this.nukeFlash = CONFIG.ABILITIES.NUKE.FLASH_ALPHA;
+        if (!soundManager.playSFX('nuke', 0.05)) soundManager.playSynth('nuke');
+        this.enemies.forEach(e => {
+            if (!e.isDead) {
+                e.takeDamage(CONFIG.ABILITIES.NUKE.DAMAGE);
+                for(let j=0; j<3; j++) this.particles.push(new SlashParticle(e.x, e.y, '#fff'));
+                this.damageNumbers.push(new DamageNumber(e.x, e.y, 'NUKE', true));
+            }
+        });
+    }
+
     updateStatsGrid(containerId) {
         const p = this.player;
         const diffLabel = this.difficulty ? this.difficulty.label : 'NORMAL';
@@ -660,10 +557,7 @@ export class Engine {
         ];
         const container = document.getElementById(containerId);
         container.innerHTML = stats.map(s => `
-            <div class="stat-item">
-                <span class="stat-label">${s.label}</span>
-                <span class="stat-value">${s.value}</span>
-            </div>
+            <div class="stat-item"><span class="stat-label">${s.label}</span><span class="stat-value">${s.value}</span></div>
         `).join('');
     }
 
@@ -672,22 +566,17 @@ export class Engine {
         const hpPerc = (p.hp / p.maxHp) * 100;
         const enPerc = (p.energy / p.maxEnergy) * 100;
         const xpPerc = (p.xp / p.xpToNext) * 100;
-        
         document.getElementById('hp-bar').style.width = `${hpPerc}%`;
         document.getElementById('energy-bar').style.width = `${enPerc}%`;
         document.getElementById('xp-bar').style.width = `${xpPerc}%`;
-        
         document.getElementById('lvl-text').innerText = p.level;
         document.getElementById('xp-val-text').innerText = Math.floor(p.xp);
         document.getElementById('xp-needed-text').innerText = p.xpToNext;
-        
         document.getElementById('hp-text').innerText = `HP: ${Math.ceil(p.hp)} / ${p.maxHp}`;
         document.getElementById('energy-text').innerText = `ENERGY: ${Math.floor(p.energy)} / ${p.maxEnergy}`;
 
-        // Ability Slots UI
         const slot1 = document.getElementById('ability-1');
         const cooldown1 = document.getElementById('ability-cooldown-1');
-        
         if (p.level >= 5) {
             slot1.classList.remove('locked');
             if (p.isChargedUp) {
@@ -703,11 +592,47 @@ export class Engine {
             cooldown1.style.height = '100%';
         }
 
-        // Empty slots (future expansion)
-        [2, 3, 4].forEach(i => {
-            document.getElementById(`ability-${i}`).classList.add('locked');
-            document.getElementById(`ability-cooldown-${i}`).style.height = '100%';
-        });
+        const slot2 = document.getElementById('ability-2');
+        const cooldown2 = document.getElementById('ability-cooldown-2');
+        // Always visible; unlocks at level 8
+        slot2.classList.remove('empty');
+        slot2.querySelector('.ability-name').innerText = p.level >= 8 ? 'INVICTUS' : 'INVICTUS (LVL 8)';
+        if (p.level >= 8) {
+            slot2.classList.remove('locked');
+            if (p.isInvincible) {
+                const remaining = (p.invincibilityEndTime - Date.now()) / CONFIG.PLAYER.INVINCIBILITY_DURATION;
+                cooldown2.style.height = `${(1 - remaining) * 100}%`;
+                slot2.style.borderColor = '#f1c40f';
+            } else {
+                cooldown2.style.height = '0%';
+                slot2.style.borderColor = p.energy >= CONFIG.PLAYER.ABILITY_2_COST ? '#f1c40f' : '#555';
+            }
+        } else {
+            slot2.classList.add('locked');
+            cooldown2.style.height = '100%';
+            slot2.style.borderColor = '#555';
+        }
+
+        // Ability 3 (NUKE) appears at lvl threshold, requires charge
+        const slot3 = document.getElementById('ability-3');
+        const cooldown3 = document.getElementById('ability-cooldown-3');
+        slot3.classList.remove('empty');
+        slot3.querySelector('.ability-name').innerText = 'NUKE';
+        if (p.level >= CONFIG.ABILITIES.NUKE.MIN_LEVEL) {
+            slot3.classList.remove('locked');
+            const ready = p.nukeCharges > 0;
+            slot3.style.borderColor = ready ? '#f1c40f' : '#555';
+            cooldown3.style.height = ready ? '0%' : '100%';
+            if (ready) slot3.querySelector('.ability-name').innerText = `NUKE (${p.nukeCharges})`;
+        } else {
+            slot3.classList.add('locked');
+            slot3.style.borderColor = '#555';
+            cooldown3.style.height = '100%';
+        }
+
+        // Ability 4 remains placeholder
+        document.getElementById(`ability-4`).classList.add('locked');
+        document.getElementById(`ability-cooldown-4`).style.height = '100%';
     }
 
     spawnEnemy(difficulty, type = 'zombie') {
@@ -726,10 +651,8 @@ export class Engine {
             this.ctx.translate(sx, sy);
         }
         this.ctx.clearRect(-50, -50, this.canvas.width + 100, this.canvas.height + 100);
-        
-        // Apply Zoom
-        this.ctx.scale(this.zoom, this.zoom);
-
+        const zoomScale = this.zoom * (1 + this.zoomPulse);
+        this.ctx.scale(zoomScale, zoomScale);
         this.drawBackground();
         this.xpOrbs.forEach(o => o.draw(this.ctx, this.camera));
         this.items.forEach(i => i.draw(this.ctx, this.camera));
@@ -738,15 +661,14 @@ export class Engine {
         this.player.draw(this.ctx, this.camera);
         this.particles.forEach(p => p.draw(this.ctx, this.camera));
         this.damageNumbers.forEach(d => d.draw(this.ctx, this.camera));
+        this.itemLabels.forEach(l => l.draw(this.ctx, this.camera));
         this.ctx.restore();
 
-        // Hit Flash (Red overlay when player hit)
         if (this.playerHitFlash > 0) {
             this.ctx.fillStyle = `rgba(231, 76, 60, ${this.playerHitFlash * 0.3})`;
             this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
             this.playerHitFlash *= 0.9;
         }
-
         if (this.nukeFlash > 0) {
             this.ctx.fillStyle = `rgba(255, 255, 255, ${this.nukeFlash})`;
             this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -759,9 +681,7 @@ export class Engine {
         const endX = startX + Math.ceil((this.canvas.width / this.zoom) / this.tileSize) + 2;
         const endY = startY + Math.ceil((this.canvas.height / this.zoom) / this.tileSize) + 2;
         for (let x = startX; x < endX; x++) {
-            for (let y = startY; y < endY; y++) {
-                this.drawTile(x, y);
-            }
+            for (let y = startY; y < endY; y++) this.drawTile(x, y);
         }
     }
 
@@ -777,8 +697,8 @@ export class Engine {
         this.ctx.fillRect(Math.floor(x), Math.floor(y), this.tileSize + 1, this.tileSize + 1);
         if (val < 0.05) {
             this.ctx.fillStyle = CONFIG.COLORS.BLOCK;
-            const size = Math.floor(this.tileSize * 0.125); // 8px for 64, 16px for 128
-            const offset = Math.floor(this.tileSize * 0.3125); // 20px for 64
+            const size = Math.floor(this.tileSize * 0.125); 
+            const offset = Math.floor(this.tileSize * 0.3125); 
             this.ctx.fillRect(x + offset, y + offset, size, size);
         }
     }

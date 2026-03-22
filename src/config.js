@@ -48,12 +48,13 @@ export const CONFIG = {
             SPEED: 1.2,
             HP: 20,
             SIZE: 26,
-            DAMAGE: 15,
-            RANGE: 300,
-            ATTACK_COOLDOWN: 2000,
-            XP_BASE: 15,
-            XP_MAX: 300,
-            ENERGY_DROP: 10,
+        DAMAGE: 15,
+        PROJ_SPEED: 8,
+        RANGE: 300,
+        ATTACK_COOLDOWN: 2000,
+        XP_BASE: 15,
+        XP_MAX: 300,
+        ENERGY_DROP: 10,
             LEVEL_UP_TIME: 12000,
             SPAWN_TIME: 60,
             SPAWN_WEIGHT: 0.4
@@ -97,10 +98,11 @@ export const CONFIG = {
     },
     BULLET: {
         SPEED: 14,
-        SIZE: 5
+        SIZE: 5,
+        DAMAGE: 10
     },
     ITEMS: {
-        DROP_CHANCE: 0.05, 
+        DROP_CHANCE: 0.5, 
         DESPAWN_TIME: 30000, // 30s
         TYPES: {
             MAGNET: { id: 'magnet', color: '#9b59b6', duration: 8000, label: '🧲', chance: 0.15 },
@@ -116,6 +118,7 @@ export const CONFIG = {
         GRASS_3: '#3b7533',
         BLOCK: '#4a4a4a',
         ZOMBIE: '#5d8a5a',
+        ZOMBIE_CLOTHES: '#3e513c',
         SKELETON: '#ecf0f1',
         LADYBUG: '#e74c3c',
         XP: '#3498db',
@@ -126,6 +129,21 @@ export const CONFIG = {
         UNCOMMON: '#2ecc71',
         RARE: '#3498db',
         LEGENDARY: '#f1c40f'
+    },
+    LEVELING: {
+        HP_PER_LEVEL: 5,
+        DMG_PER_LEVEL: 1,
+        SPD_PER_LEVEL: 0.05,
+        ATK_COOLDOWN_MULT: 0.98,
+        PROJ_INTERVAL: 1,
+        PROJ_PER_INTERVAL: 1,
+        XP_GROWTH_MULT: 1.3,
+        XP_GROWTH_BASE: 10
+    },
+    ABILITIES: {
+        CHARGE: { MIN_LEVEL: 5 },
+        INVINCIBLE: { MIN_LEVEL: 8 },
+        NUKE: { MIN_LEVEL: 10, MAX_CHARGES: 3, DAMAGE: 9999, SCREEN_SHAKE: 50, FLASH_ALPHA: 1.0 }
     }
 };
 

@@ -231,3 +231,35 @@ export class DamageNumber {
         if (!keys.isMobile) ctx.globalAlpha = 1.0;
     }
 }
+
+// Floating label shown when items are picked up
+export class ItemLabel {
+    constructor(x, y, text, color = '#fff') {
+        this.x = x;
+        this.y = y;
+        this.text = text;
+        this.color = color;
+        this.vy = -1.5;
+        this.life = 1.0;
+        this.decay = 0.02;
+    }
+
+    update() {
+        this.y += this.vy;
+        this.vy *= 0.96;
+        this.life -= this.decay;
+    }
+
+    draw(ctx, camera) {
+        const sx = this.x - camera.x;
+        const sy = this.y - camera.y;
+        ctx.save();
+        if (!keys.isMobile) ctx.globalAlpha = Math.max(0, this.life);
+        ctx.fillStyle = this.color;
+        ctx.font = `bold ${keys.isMobile ? 12 : 16}px Segoe UI`;
+        ctx.textAlign = 'center';
+        ctx.fillText(this.text, sx, sy);
+        if (!keys.isMobile) ctx.globalAlpha = 1.0;
+        ctx.restore();
+    }
+}

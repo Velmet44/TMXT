@@ -1,56 +1,47 @@
 import { CONFIG } from './config.js';
 import { keys } from './input.js';
+import { soundManager } from './SoundManager.js';
 
 export class Player {
     constructor(x, y) {
         this.x = x;
         this.y = y;
         this.size = CONFIG.PLAYER.SIZE;
-        
+
         // Base Stats
-        this.maxHp = CONFIG.PLAYER.MAX_HP;
-        this.hp = CONFIG.PLAYER.MAX_HP;
         this.speed = CONFIG.PLAYER.SPEED;
+        this.maxHp = CONFIG.PLAYER.MAX_HP;
+        this.hp = this.maxHp;
         this.regen = CONFIG.PLAYER.REGEN;
         this.damage = CONFIG.PLAYER.DAMAGE;
-        this.atkRange = CONFIG.PLAYER.ATTACK_RANGE;
         this.atkCooldown = CONFIG.PLAYER.ATTACK_COOLDOWN;
-        this.lifesteal = CONFIG.PLAYER.LIFESTEAL;
+        this.atkRange = CONFIG.PLAYER.ATTACK_RANGE;
         this.projCount = CONFIG.PLAYER.PROJ_COUNT;
         
-        // Energy Stats
+        // Progression
+        this.level = 1;
+        this.xp = 0;
+        this.xpToNext = 10;
+        this.totalXp = 0;
+
+        // Energy
         this.maxEnergy = CONFIG.PLAYER.MAX_ENERGY;
         this.energy = this.maxEnergy;
         this.energyRegenMult = 1.0;
+
+        // State
+        this.isDead = false;
+        this.lastAttack = 0;
         this.isDashing = false;
-        this.dashStartTime = 0;
-        this.dashDir = { x: 0, y: 0 };
-        this.dashTrail = [];
-        
-        // Ability State
+        this.dashEndTime = 0;
         this.isChargedUp = false;
         this.chargeUpEndTime = 0;
-        
-        // Leveling
-        this.level = 1;
-        this.xp = 0;
-        this.totalXp = 0;
-        this.xpToNext = 10;
-        
-        // Animation & State
-        this.state = 'idle'; 
-        this.frame = 0;
-        this.facing = 1;
-        this.isAttacking = false;
-        this.lastAttack = 0;
-        this.isDead = false;
-        
-        // Gun Stats
-        this.gunRecoil = 0;
-        
-        // Sprite Selection
-        this.sprite = new Image();
-        this.sprite.src = 'assets/char_1.svg';
+        this.isInvincible = false;
+        this.invincibilityEndTime = 0;
+        this.nukeCharges = 0;
+        this.lastRegen = Date.now();
+        this.lastXp = 0;
+        this.difficulty = null;
 
         // Item Effects
         this.itemEffects = {
@@ -58,276 +49,254 @@ export class Player {
             speedEndTime: 0,
             rapidEndTime: 0
         };
+
+        // Visual Juice
+        this.gunRecoil = 0;
+        this.rotation = 0;
+        this.tilt = 0;
+        this.walkTimer = 0;
+
+        // Sprite
+        this.sprite = new Image();
+        this.spriteLoaded = false;
+        this.sprite.onload = () => { this.spriteLoaded = true; };
+        this.sprite.src = 'assets/char_1.svg';
     }
 
     setCharacter(index) {
-        this.sprite.src = `assets/char_${index}.svg`;
-    }
-
-    update() {
-        if (this.isDead) return;
-
-        const now = Date.now();
-
-        // 1. Passive Regen (HP & Energy)
-        if (this.hp < this.maxHp) {
-            this.hp = Math.min(this.maxHp, this.hp + this.regen);
-        }
-
-        // Energy Regen (Idle vs Walk)
-        let eRegen = (this.state === 'idle') ? CONFIG.PLAYER.ENERGY_REGEN_IDLE : CONFIG.PLAYER.ENERGY_REGEN_WALK;
-        this.energy = Math.min(this.maxEnergy, this.energy + eRegen * this.energyRegenMult);
-
-        // 2. Dash Handling
-        if (keys.shift && !this.isDashing && this.energy >= CONFIG.PLAYER.DASH_COST) {
-            this.startDash();
-        }
-
-        if (this.isDashing) {
-            if (now - this.dashStartTime < CONFIG.PLAYER.DASH_DURATION) {
-                this.x += this.dashDir.x * CONFIG.PLAYER.DASH_SPEED;
-                this.y += this.dashDir.y * CONFIG.PLAYER.DASH_SPEED;
-                // Add to trail every 2 frames
-                if (this.frame % 2 === 0) {
-                    this.dashTrail.push({ x: this.x, y: this.y, life: 1.0, facing: this.facing });
-                }
-            } else {
-                this.isDashing = false;
+        this.characterIndex = index;
+        if (index) {
+            const imgPath = `assets/char_${index}.svg`;
+            if (this.sprite.src !== imgPath) {
+                this.spriteLoaded = false;
+                this.sprite = new Image();
+                this.sprite.onload = () => { this.spriteLoaded = true; };
+                this.sprite.src = imgPath;
             }
         }
-
-        // Update trail
-        for (let i = this.dashTrail.length - 1; i >= 0; i--) {
-            this.dashTrail[i].life -= 0.1;
-            if (this.dashTrail[i].life <= 0) {
-                this.dashTrail.splice(i, 1);
-            }
-        }
-
-        // 3. Ability Handling (Needs Level 5 and 100 energy)
-        // Remapped to 'z' and added slots for x, c, v
-        if (keys.z && this.level >= 5 && !this.isChargedUp && this.energy >= CONFIG.PLAYER.ABILITY_COST) {
-            this.activateChargeUp();
-        }
-        
-        // Placeholder for future abilities
-        if (keys.x) { /* Slot 2 */ }
-        if (keys.c) { /* Slot 3 */ }
-        if (keys.v) { /* Slot 4 */ }
-
-        if (this.isChargedUp && now > this.chargeUpEndTime) {
-            this.isChargedUp = false;
-        }
-
-        // 4. Movement
-        let moveX = 0;
-        let moveY = 0;
-
-        // Support both keyboard and mobile joystick
-        if (keys.isMobile) {
-            moveX = keys.mobileX;
-            moveY = keys.mobileY;
-        } else {
-            if (keys.w) moveY -= 1;
-            if (keys.s) moveY += 1;
-            if (keys.a) moveX -= 1;
-            if (keys.d) moveX += 1;
-        }
-
-        if (moveX !== 0 || moveY !== 0) {
-            const mag = Math.sqrt(moveX * moveX + moveY * moveY);
-            // Normalize keyboard input but keep joystick's analog value
-            const speedMult = keys.isMobile ? mag : 1;
-            moveX = (moveX / (mag || 1)) * this.getCurrentSpeed() * speedMult;
-            moveY = (moveY / (mag || 1)) * this.getCurrentSpeed() * speedMult;
-            this.state = 'walking';
-            if (moveX !== 0) this.facing = Math.sign(moveX);
-            this.dashDir = { x: moveX / (this.getCurrentSpeed() * speedMult || 1), y: moveY / (this.getCurrentSpeed() * speedMult || 1) };
-        } else {
-            this.state = 'idle';
-        }
-
-        this.x += moveX;
-        this.y += moveY;
-
-        const animSpeed = this.state === 'walking' ? 0.15 : 0.05;
-        this.frame += animSpeed;
-
-        if (this.isAttacking && now - this.lastAttack > 200) {
-            this.isAttacking = false;
-        }
-
-        // Recoil recovery
-        this.gunRecoil *= 0.8;
-
-        if (this.hp <= 0) {
-            this.isDead = true;
-            this.hp = 0;
-        }
-    }
-
-    getCurrentSpeed() {
-        let speed = this.isChargedUp ? this.speed * 1.5 : this.speed;
-        if (this.itemEffects.speedEndTime > Date.now()) {
-            speed *= CONFIG.ITEMS.TYPES.SPEED.value;
-        }
-        return speed;
-    }
-
-    getCurrentDamage() {
-        return this.isChargedUp ? this.damage * 2 : this.damage;
-    }
-
-    getCurrentAtkCooldown() {
-        let cd = this.isChargedUp ? this.atkCooldown * 0.5 : this.atkCooldown;
-        if (this.itemEffects.rapidEndTime > Date.now()) {
-            cd *= CONFIG.ITEMS.TYPES.RAPID.value;
-        }
-        return cd;
-    }
-
-    startDash() {
-        if (this.dashDir.x === 0 && this.dashDir.y === 0) {
-            this.dashDir = { x: this.facing, y: 0 };
-        }
-        this.energy -= CONFIG.PLAYER.DASH_COST;
-        this.isDashing = true;
-        this.dashStartTime = Date.now();
-        this.dashTrail = [];
-    }
-
-    activateChargeUp() {
-        this.energy -= CONFIG.PLAYER.ABILITY_COST;
-        this.isChargedUp = true;
-        this.chargeUpEndTime = Date.now() + CONFIG.PLAYER.CHARGEUP_DURATION;
+        // Optional: Character-specific base stat adjustments
     }
 
     addXP(amount) {
-        const xpGain = this.difficulty ? amount * this.difficulty.xpMult : amount;
-        this.xp += xpGain;
-        this.totalXp += xpGain;
+        const gain = amount * (this.difficulty?.xpMult || 1);
+        this.xp += gain;
+        this.totalXp += gain;
         if (this.xp >= this.xpToNext) {
-            this.xp -= this.xpToNext;
-            this.level++;
-            this.xpToNext = Math.round(this.xpToNext * 2);
-            
-            // PASSIVE STAT GROWTH
-            this.maxHp += 5;
-            this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.1);
-            this.damage += 1;
-            this.regen += 0.005;
-            this.speed += 0.05;
-            this.atkRange += 5;
-            
-            // Energy Growth
-            this.maxEnergy += 10;
-            this.energyRegenMult += 0.05;
-
-            if (this.level % 2 === 1 && this.level > 1) {
-                this.projCount += 1;
-            }
-
+            this.levelUp();
             return true;
         }
         return false;
     }
 
-    attack(targetX, targetY) {
-        this.isAttacking = true;
+    levelUp() {
+        this.level++;
+        this.xp -= this.xpToNext;
+        this.xpToNext = Math.floor(this.xpToNext * CONFIG.LEVELING.XP_GROWTH_MULT) + CONFIG.LEVELING.XP_GROWTH_BASE;
+
+        const lv = CONFIG.LEVELING;
+        this.maxHp += lv.HP_PER_LEVEL;
+        this.hp = Math.min(this.maxHp, this.hp + lv.HP_PER_LEVEL);
+        this.damage += lv.DMG_PER_LEVEL;
+        this.atkCooldown *= lv.ATK_COOLDOWN_MULT;
+        this.speed += lv.SPD_PER_LEVEL;
+        if (lv.PROJ_INTERVAL > 0 && this.level % lv.PROJ_INTERVAL === 0) {
+            this.projCount += lv.PROJ_PER_INTERVAL;
+        }
+
+        if (this.godMode) {
+            this.hp = this.maxHp;
+        }
+    }
+
+    getCurrentSpeed() {
+        let currentSpeed = this.speed;
+        if (this.isDashing) return CONFIG.PLAYER.DASH_SPEED;
+        
+        if (this.isInvincible) {
+            currentSpeed *= CONFIG.PLAYER.INVINCIBILITY_SPEED_MULT;
+        } else {
+            if (this.itemEffects.speedEndTime > Date.now()) currentSpeed *= 1.5;
+            if (this.isChargedUp) currentSpeed *= 1.2;
+        }
+        
+        return currentSpeed;
+    }
+
+    getCurrentAtkCooldown() {
+        let cd = this.atkCooldown;
+        if (this.itemEffects.rapidEndTime > Date.now()) cd *= 0.4;
+        if (this.isChargedUp) cd *= 0.5;
+        return cd;
+    }
+
+    getCurrentDamage() {
+        let dmg = this.damage;
+        if (this.isChargedUp) dmg *= 1.5;
+        if (this.isInvincible) dmg *= 2.0; // Invincibility also gives dmg boost
+        return dmg;
+    }
+
+    takeDamage(amount) {
+        if (this.isInvincible || this.isDead) return false;
+        
+        let dmg = amount;
+        if (this.armor) dmg *= (1 - this.armor);
+        this.hp -= dmg;
+        
+        if (this.hp <= 0) {
+            this.hp = 0;
+            this.isDead = true;
+        }
+        return true;
+    }
+
+    update() {
+        if (this.isDead) return;
+
+        // Input
+        let mx = 0;
+        let my = 0;
+
+        if (keys.w) my -= 1;
+        if (keys.s) my += 1;
+        if (keys.a) mx -= 1;
+        if (keys.d) mx += 1;
+
+        // Mobile
+        if (keys.mobileX !== 0 || keys.mobileY !== 0) {
+            mx = keys.mobileX;
+            my = keys.mobileY;
+        }
+
+        const dist = Math.sqrt(mx * mx + my * my);
+        if (dist > 0.1) {
+            const speed = this.getCurrentSpeed();
+            const moveX = (mx / dist) * speed;
+            const moveY = (my / dist) * speed;
+            this.x += moveX;
+            this.y += moveY;
+            this.rotation = Math.atan2(moveY, moveX);
+            this.walkTimer += 0.2;
+            this.tilt += (0.1 - this.tilt) * 0.1;
+            
+            // Energy Regen while walking
+            this.energy = Math.min(this.maxEnergy, this.energy + CONFIG.PLAYER.ENERGY_REGEN_WALK * this.energyRegenMult);
+        } else {
+            this.tilt *= 0.9;
+            // Energy Regen while idle (faster)
+            this.energy = Math.min(this.maxEnergy, this.energy + CONFIG.PLAYER.ENERGY_REGEN_IDLE * this.energyRegenMult);
+        }
+
+        // Dash Logic
+        if (keys.shift && !this.isDashing && this.energy >= CONFIG.PLAYER.DASH_COST) {
+            this.isDashing = true;
+            this.dashEndTime = Date.now() + CONFIG.PLAYER.DASH_DURATION;
+            this.energy -= CONFIG.PLAYER.DASH_COST;
+        }
+
+        if (this.isDashing && Date.now() > this.dashEndTime) {
+            this.isDashing = false;
+        }
+
+        // Ability 1 Logic (ChargeUp)
+        if (keys.z && !this.isChargedUp && this.level >= CONFIG.ABILITIES.CHARGE.MIN_LEVEL && this.energy >= CONFIG.PLAYER.ABILITY_COST) {
+            this.isChargedUp = true;
+            this.chargeUpEndTime = Date.now() + CONFIG.PLAYER.CHARGEUP_DURATION;
+            this.energy -= CONFIG.PLAYER.ABILITY_COST;
+            if (!soundManager.playSFX('charge', 0.05)) soundManager.playSynth('crit');
+        }
+
+        if (this.isChargedUp && Date.now() > this.chargeUpEndTime) {
+            this.isChargedUp = false;
+        }
+
+        // Ability 2 Logic (Invincibility)
+        if (keys.x && !this.isInvincible && this.level >= CONFIG.ABILITIES.INVINCIBLE.MIN_LEVEL && this.energy >= CONFIG.PLAYER.ABILITY_2_COST) {
+            this.isInvincible = true;
+            this.invincibilityEndTime = Date.now() + CONFIG.PLAYER.INVINCIBILITY_DURATION;
+            this.energy -= CONFIG.PLAYER.ABILITY_2_COST;
+            if (!soundManager.playSFX('invincible', 0.05)) soundManager.playSynth('magnet');
+        }
+
+        if (this.isInvincible && Date.now() > this.invincibilityEndTime) {
+            this.isInvincible = false;
+        }
+
+        // Passive Regen
+        if (Date.now() - this.lastRegen > 1000) {
+            this.hp = Math.min(this.maxHp, this.hp + this.regen);
+            this.lastRegen = Date.now();
+        }
+
+        if (this.gunRecoil > 0) this.gunRecoil *= 0.8;
+    }
+
+    attack(tx, ty) {
         this.lastAttack = Date.now();
-        this.facing = targetX > this.x ? 1 : -1;
     }
 
     draw(ctx, camera) {
-        const screenX = this.x - camera.x;
-        const screenY = this.y - camera.y;
-
-        // Draw Dash Trail
-        ctx.save();
-        this.dashTrail.forEach(p => {
-            ctx.globalAlpha = p.life * 0.5;
-            ctx.drawImage(this.sprite, p.x - camera.x - this.size/2, p.y - camera.y - this.size/2, this.size, this.size);
-        });
-        ctx.restore();
+        const px = this.x - camera.x;
+        const py = this.y - camera.y;
 
         ctx.save();
-        ctx.translate(screenX, screenY);
+        ctx.translate(px, py);
         
-        if (this.isDead) {
-            ctx.rotate(Math.PI / 2);
-            ctx.fillStyle = '#2c3e50';
-            ctx.fillRect(-this.size/2, -this.size/2, this.size, this.size);
-            ctx.restore();
-            return;
-        }
-
-        // Dash trail effect (Simple)
-        if (this.isDashing) {
-            ctx.globalAlpha = 0.5;
-            ctx.fillStyle = CONFIG.COLORS.ENERGY;
-            ctx.fillRect(-this.size/2 - 20 * this.dashDir.x, -this.size/2 - 20 * this.dashDir.y, this.size, this.size);
-            ctx.globalAlpha = 1.0;
-        }
-
-        // Chargeup Glow
-        if (this.isChargedUp && !keys.isMobile) {
-            ctx.shadowBlur = 20;
-            ctx.shadowColor = '#e74c3c';
-        }
-
-        ctx.scale(this.facing, 1);
-
-        const idleBob = Math.sin(this.frame) * 2;
-        const walkBounce = Math.abs(Math.sin(this.frame * 2)) * 6;
-        const walkTilt = Math.sin(this.frame * 2) * 0.1;
-        
-        const currentBounce = this.state === 'walking' ? -walkBounce : -idleBob;
-        if (this.state === 'walking') ctx.rotate(walkTilt);
+        // Walk Wobble
+        const walkY = Math.sin(this.walkTimer) * 3;
+        const walkAngle = Math.cos(this.walkTimer) * 0.1;
+        ctx.rotate(walkAngle);
+        ctx.translate(0, walkY);
 
         // Shadow
-        if (!keys.isMobile) {
-            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(0, this.size/2, this.size/2, this.size/4, 0, 0, Math.PI*2);
+        ctx.fill();
+
+        // Invincibility Glow
+        if (this.isInvincible) {
+            ctx.strokeStyle = '#f1c40f';
+            ctx.lineWidth = 4;
             ctx.beginPath();
-            ctx.ellipse(0, this.size/2, 12, 6, 0, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        // New Character Sprite
-        ctx.drawImage(this.sprite, -this.size/2 - 4, -this.size/2 - 12 + currentBounce, this.size + 8, this.size + 16);
-
-        // Futuristic Gun (Blaster)
-        ctx.save();
-        const gunX = 15 - this.gunRecoil;
-        const gunY = -2 + currentBounce;
-        ctx.translate(gunX, gunY);
-        
-        if (this.isAttacking) {
-            ctx.rotate(-0.2); // Recoil tilt
+            ctx.arc(0, 0, this.size * 0.8, 0, Math.PI * 2);
+            ctx.stroke();
             
-            // Muzzle Flash
-            ctx.fillStyle = '#fff';
-            ctx.beginPath();
-            ctx.arc(22, 0, 8 + Math.random() * 8, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = '#f1c40f';
-            ctx.beginPath();
-            ctx.arc(22, 0, 5 + Math.random() * 5, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(241, 196, 15, 0.2)';
             ctx.fill();
         }
 
-        // Gun Body
-        ctx.fillStyle = '#34495e';
-        ctx.fillRect(0, -3, 18, 6); // Frame
-        ctx.fillStyle = '#1a1a1a';
-        ctx.fillRect(-2, -1, 5, 8); // Grip
-        ctx.fillStyle = '#7f8c8d';
-        ctx.fillRect(16, -4, 8, 4); // Barrel
-        
-        // Energy Light
-        ctx.fillStyle = this.isChargedUp ? '#e74c3c' : '#3498db';
-        ctx.fillRect(4, -1.5, 8, 2);
-        
-        ctx.restore();
+        // Body
+        if (this.spriteLoaded) {
+            const scale = this.isInvincible ? 1.12 : (this.isChargedUp ? 1.05 : 1);
+            const size = this.size * scale;
+            ctx.drawImage(this.sprite, -size / 2, -size / 2, size, size);
+            // overlay tint for states
+            if (this.isInvincible || this.isChargedUp) {
+                ctx.fillStyle = this.isInvincible ? 'rgba(241,196,15,0.35)' : 'rgba(155,89,182,0.35)';
+                ctx.fillRect(-size / 2, -size / 2, size, size);
+            }
+        } else {
+            ctx.save();
+            // Body color based on state
+            if (this.isInvincible) ctx.fillStyle = '#f1c40f';
+            else if (this.isChargedUp) ctx.fillStyle = '#9b59b6';
+            else ctx.fillStyle = '#3498db';
+            
+            ctx.fillRect(-this.size/2, -this.size/2, this.size, this.size);
+            
+            // Eyes
+            ctx.fillStyle = '#fff';
+            const eyeSize = this.size * 0.2;
+            ctx.fillRect(-this.size/2 + 4, -this.size/4, eyeSize, eyeSize);
+            ctx.fillRect(this.size/2 - 4 - eyeSize, -this.size/4, eyeSize, eyeSize);
+            
+            // Energy Light
+            ctx.fillStyle = this.isChargedUp ? '#e74c3c' : '#3498db';
+            ctx.fillRect(4, -1.5, 8, 2);
+
+            ctx.restore();
+        }
 
         ctx.restore();
     }
