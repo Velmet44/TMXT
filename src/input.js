@@ -14,10 +14,17 @@ export const keys = {
     // Mobile virtual keys
     mobileX: 0,
     mobileY: 0,
-    isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
-              (window.innerWidth <= 850 && window.innerHeight <= 500) || 
-              (window.innerWidth <= 500 && window.innerHeight <= 850)
+    isMobile: false // Will be determined on start/init
 };
+
+// Robust mobile detection
+function checkIsMobile() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+           ('ontouchstart' in window) || 
+           (window.innerWidth <= 1024 && window.innerHeight <= 1024);
+}
+
+keys.isMobile = checkIsMobile();
 
 class Joystick {
     constructor() {
@@ -142,13 +149,7 @@ window.addEventListener('blur', () => {
 }, { capture: true });
 
 function requestMobileOptimizations() {
-    // Attempt to force landscape if supported
-    if (screen.orientation && screen.orientation.lock) {
-        screen.orientation.lock('landscape').catch(err => {
-            console.warn(`Error attempting to lock orientation: ${err.message}`);
-        });
-    }
-
+    // We don't force landscape anymore to allow portrait
     const doc = window.document;
     const docEl = doc.documentElement;
     const requestFullScreen = docEl.requestFullscreen || docEl.mozRequestFullScreen || docEl.webkitRequestFullScreen || docEl.msRequestFullscreen;
@@ -209,9 +210,10 @@ if (diffBtns) {
 if (startBtn) {
     startBtn.addEventListener('click', () => {
         keys.selectedCharIndex = currentCharIndex;
-        // Check if we should show mobile controls
-        const isActuallyMobile = keys.isMobile || ('ontouchstart' in window);
-        if (isActuallyMobile) {
+        // Update isMobile check on start to be sure
+        keys.isMobile = checkIsMobile();
+        
+        if (keys.isMobile) {
             requestMobileOptimizations();
             const mobileControls = document.getElementById('mobile-controls');
             if (mobileControls) mobileControls.classList.remove('hidden');
@@ -222,46 +224,41 @@ if (startBtn) {
     });
 }
 
-// Initialize Mobile Controls if they exist and we are on mobile
-const isActuallyMobile = keys.isMobile || ('ontouchstart' in window);
-if (isActuallyMobile) {
-    const mobileControls = document.getElementById('mobile-controls');
-    // Don't show immediately if menu is present, wait for start
-    
-    new Joystick();
+// Always try to init Joystick if elements exist
+new Joystick();
 
-    // Mobile Action Buttons
-    const dashBtn = document.getElementById('btn-dash');
-    if (dashBtn) {
-        dashBtn.addEventListener('touchstart', (e) => {
+// Mobile Action Buttons
+const dashBtn = document.getElementById('btn-dash');
+if (dashBtn) {
+    dashBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (!keys.shift) soundManager.playSFX('dash');
+        keys.shift = true;
+    }, { passive: false });
+    dashBtn.addEventListener('touchend', (e) => {
+        keys.shift = false;
+    });
+}
+
+const abilityKeys = ['z', 'x', 'c', 'v'];
+abilityKeys.forEach((key, index) => {
+    const btn = document.getElementById(`btn-ability-${index + 1}`);
+    if (btn) {
+        btn.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            if (!keys.shift) soundManager.playSFX('dash');
-            keys.shift = true;
+            keys[key] = true;
         }, { passive: false });
-        dashBtn.addEventListener('touchend', (e) => {
-            keys.shift = false;
+        btn.addEventListener('touchend', (e) => {
+            keys[key] = false;
         });
     }
+});
 
-    const abilityKeys = ['z', 'x', 'c', 'v'];
-    abilityKeys.forEach((key, index) => {
-        const btn = document.getElementById(`btn-ability-${index + 1}`);
-        if (btn) {
-            btn.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                keys[key] = true;
-            }, { passive: false });
-            btn.addEventListener('touchend', (e) => {
-                keys[key] = false;
-            });
-        }
-    });
-
-    const triggerOptimizations = () => {
-        if ((mainMenu && !mainMenu.classList.contains('hidden')) || (cgMenu && !cgMenu.classList.contains('hidden'))) {
-            requestMobileOptimizations();
-        }
-    };
-    document.addEventListener('touchstart', triggerOptimizations, { once: true });
-    document.addEventListener('mousedown', triggerOptimizations, { once: true });
-}
+// Orientation change handling
+window.addEventListener('resize', () => {
+    keys.isMobile = checkIsMobile();
+    const mobileControls = document.getElementById('mobile-controls');
+    if (keys.isMobile && mainMenu && mainMenu.classList.contains('hidden') && cgMenu && cgMenu.classList.contains('hidden')) {
+        if (mobileControls) mobileControls.classList.remove('hidden');
+    }
+});

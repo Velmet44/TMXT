@@ -233,136 +233,44 @@ body {
         transform: scale(0.6);
         gap: 2px;
     }
+    /* ... standard landscape mobile ... */
+}
+
+/* Portrait Mode Specific */
+@media (orientation: portrait) {
+    #hud {
+        transform: scale(1.0); /* Make HUD bigger in portrait */
+        left: 10px;
+        top: 10px;
+        right: 10px;
+    }
     .bar-container {
-        width: 150px;
-        height: 14px;
-        border-width: 1px;
+        width: 250px; /* Wider than landscape scale but fits portrait */
+        height: 20px;
     }
     #timer {
-        font-size: 24px;
-        right: 0;
-        transform: scale(1.6); /* Counter-scale timer to keep it readable */
-        transform-origin: top right;
+        font-size: 28px;
+        transform: none;
     }
     #ability-slots {
-        display: none;
+        display: flex; /* Show them in portrait if there's room */
+        transform: scale(0.7);
+        transform-origin: top left;
     }
 
-    /* Joystick and Buttons Scaling */
     #joystick-container {
-        bottom: 5px;
-        left: 5px;
-        transform: scale(0.6);
+        bottom: 15%;
+        left: 20px;
+        transform: scale(1.2); /* Bigger joystick for easier use */
     }
     #mobile-buttons {
-        bottom: 5px;
-        right: 5px;
-        transform: scale(0.6);
-    }
-
-    /* Main Menu Mobile Fix */
-    .menu-scroll-container {
-        padding: 10px 0;
-        height: 100svh;
-    }
-    .menu-content.split-layout {
-        flex-direction: column;
-        gap: 5px;
-        width: 98%;
-        padding-bottom: 20px;
-        min-height: auto;
-    }
-    .menu-left, .menu-right {
-        width: 100%;
-        flex: none;
-    }
-    .game-title { 
-        font-size: 28px; 
-        letter-spacing: 2px; 
-    }
-    .game-subtitle { 
-        font-size: 8px; 
-        letter-spacing: 2px; 
-        margin-bottom: 5px;
-    }
-    .deployment-box {
-        padding: 10px;
-        border-radius: 10px;
-    }
-    .character-preview-box {
-        padding: 5px;
-        gap: 5px;
-    }
-    #character-display {
-        width: 60px;
-        height: 60px;
-    }
-    .glow-button { 
-        padding: 6px 15px; 
-        font-size: 12px; 
-    }
-    .difficulty-options {
-        gap: 3px;
-        margin-bottom: 5px;
-    }
-    .diff-btn {
-        padding: 2px 5px;
-        font-size: 7px;
-    }
-    .section-label {
-        font-size: 9px;
-        margin-bottom: 5px;
-    }
-    #char-name {
-        font-size: 14px;
-        margin-top: 5px;
-    }
-
-    /* Modals Mobile Fix */
-    .modal {
-        padding: 8px;
-        width: 98%;
-        max-height: 98svh;
-        transform: scale(0.85); /* Global modal scale down */
-    }
-    .modal h1 { font-size: 16px; }
-    .death-modal h1 { font-size: 28px; }
-    .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 0 8px;
-    }
-    .stat-item {
-        padding: 1px 0;
-        font-size: 8px;
-    }
-    #upgrade-list {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 5px;
-        margin-top: 5px;
-    }
-    .upgrade-card {
-        padding: 6px;
-        gap: 6px;
-    }
-    .upgrade-icon { font-size: 20px; }
-    .upgrade-name { font-size: 11px; }
-    .upgrade-desc { font-size: 8px; }
-    
-    .story-section {
-        padding: 15px 0;
-        margin-top: 20px;
-    }
-    .story-content {
-        font-size: 10px;
-    }
-    .story-title {
-        font-size: 14px;
-        margin-bottom: 10px;
+        bottom: 15%;
+        right: 20px;
+        transform: scale(1.2);
     }
 }
 
-/* Main Menu & Overlays */
-.overlay {
+/* Main Menu & Overlays */.overlay {
     position: absolute;
     inset: 0;
     background: radial-gradient(circle, #2c3e50 0%, #000 100%);
