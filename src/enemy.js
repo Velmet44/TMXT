@@ -155,6 +155,7 @@ export class Enemy {
     }
 
     takeDamage(amount) {
+        if (this.type === 'exploder' && this.isExploding) return; // Invincible once fuse starts
         this.hp -= amount;
         this.isHit = true;
         this.hitTimer = 0;

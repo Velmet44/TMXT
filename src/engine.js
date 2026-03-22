@@ -82,6 +82,7 @@ export class Engine {
                 
                 // Play Game BGM
                 soundManager.playBGM('game');
+                soundManager.playSFX('start');
 
                 // Adjust Player HP
                 this.player.maxHp = Math.round(this.player.maxHp * this.difficulty.hpMult);
@@ -241,6 +242,7 @@ export class Engine {
             if (this.player.isDead) {
                 const screen = document.getElementById('death-screen');
                 if (screen.classList.contains('hidden')) {
+                    soundManager.playSFX('death');
                     screen.classList.remove('hidden');
                     const timerText = document.getElementById('timer').innerText;
                     document.getElementById('final-time').innerText = timerText;
@@ -419,6 +421,7 @@ export class Engine {
             const item = this.items[i];
             // Check pickup (returns true if picked up)
             if (item.update(this.player, magnetActive)) {
+                soundManager.playSFX('pickup');
                 
                 // Apply Effect
                 const type = item.type;

@@ -9,7 +9,7 @@ export class SoundManager {
         this.sfxVolume = 0.5;
         this.wasPlayingBeforeHide = false;
         
-        this.sfxFiles = ['shoot', 'hit', 'xp', 'lvlup', 'dash', 'kick', 'hurt'];
+        this.sfxFiles = ['shoot', 'hit', 'xp', 'lvlup', 'dash', 'kick', 'hurt', 'pickup', 'death', 'start'];
 
         // Auto-pause when tab is hidden
         document.addEventListener('visibilitychange', () => {
