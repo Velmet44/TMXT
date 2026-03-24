@@ -173,7 +173,7 @@ const prevBtn = document.getElementById('prev-char');
 const nextBtn = document.getElementById('next-char');
 
 let currentCharIndex = 1;
-const totalChars = 1;
+const totalChars = 2;
 
 function updateCharPreview() {
     if (charPreview) charPreview.src = `assets/char_${currentCharIndex}.svg`;
@@ -185,9 +185,6 @@ if (prevBtn) {
         currentCharIndex = currentCharIndex > 1 ? currentCharIndex - 1 : totalChars;
         updateCharPreview();
     });
-    prevBtn.disabled = true;
-    prevBtn.style.opacity = '0.3';
-    prevBtn.style.pointerEvents = 'none';
 }
 
 if (nextBtn) {
@@ -195,13 +192,12 @@ if (nextBtn) {
         currentCharIndex = currentCharIndex < totalChars ? currentCharIndex + 1 : 1;
         updateCharPreview();
     });
-    nextBtn.disabled = true;
-    nextBtn.style.opacity = '0.3';
-    nextBtn.style.pointerEvents = 'none';
 }
 
 keys.currentDifficulty = 'NORMAL';
 keys.selectedCharIndex = 1;
+
+updateCharPreview();
 
 if (diffBtns) {
     diffBtns.forEach(btn => {

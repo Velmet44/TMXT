@@ -34,7 +34,9 @@ export class Engine {
         this.hitStop = 0;
         this.playerHitFlash = 0;
         this.zoomPulse = 0;
-        this.particleMult = keys.isMobile ? CONFIG.PARTICLES.MOBILE_MULT : 1;
+        this.particleMult = keys.isMobile ? CONFIG.PARTICLES.MOBILE_MULT : CONFIG.PARTICLES.PC_MULT;
+        this.wasDashing = false;
+        this.dashHitSet = new Set();
         
         soundManager.playBGM('menu');
         this.tileSize = keys.isMobile ? CONFIG.TILE_SIZE * 2 : CONFIG.TILE_SIZE;
@@ -215,15 +217,37 @@ export class Engine {
                     const timerText = document.getElementById('timer').innerText;
                     document.getElementById('final-time').innerText = timerText;
                     this.updateStatsGrid('death-stats');
+                    this.finalTimeStr = timerText;
                 }
             }
             return;
         }
 
+        const wasDashingBefore = this.player.isDashing;
         this.player.update();
+        if (this.player.isDashing && !wasDashingBefore) this.dashHitSet.clear();
         if (this.player.isDashing) this.screenShake = Math.max(this.screenShake, 5);
         if (this.player.isChargedUp && Math.random() < 0.1) this.screenShake = Math.max(this.screenShake, 2);
         if (this.player.isInvincible) this.screenShake = Math.max(this.screenShake, 3);
+        if (this.player.isDashing) {
+            this.enemies.forEach(enemy => {
+                if (enemy.isDead) return;
+                if (this.dashHitSet.has(enemy)) return;
+                const dx = this.player.x - enemy.x;
+                const dy = this.player.y - enemy.y;
+                const distSq = dx*dx + dy*dy;
+                const hitRange = (this.player.size + enemy.size) ** 2;
+                if (distSq < hitRange) {
+                    const dmg = this.player.getCurrentDamage() * (this.player.dashDamageMult || 0);
+                    if (dmg > 0) {
+                        enemy.takeDamage(dmg);
+                        this.spawnHitParticles(enemy.x, enemy.y, this.player.dashParticle || '#fff', 6);
+                        this.damageNumbers.push(new DamageNumber(enemy.x, enemy.y, dmg, true));
+                        this.dashHitSet.add(enemy);
+                    }
+                }
+            });
+        }
         // Ability 3 (Nuke) activation: level gate 10 and requires stored charge
         if (keys.c && !this.wasAbility3Down && this.player.level >= CONFIG.ABILITIES.NUKE.MIN_LEVEL && this.player.nukeCharges > 0) {
             this.activateNuke();
@@ -415,6 +439,7 @@ export class Engine {
         this.enemies.forEach(e => {
             if (e.isDead && !e.dropsSpawned) {
                 e.dropsSpawned = true;
+                this.player.killCount += 1;
                 this.screenShake = Math.max(this.screenShake, 5);
                 this.hitStop = 1;
                 soundManager.playSFX('kick');
@@ -460,7 +485,7 @@ export class Engine {
         });
         this.enemies = this.enemies.filter(e => e.hp !== -999 && (!e.isDead || e.deathTimer < 1));
 
-        if (now - this.player.lastAttack > this.player.getCurrentAtkCooldown()) {
+        if (this.player.canShoot !== false && now - this.player.lastAttack > this.player.getCurrentAtkCooldown()) {
             let targets = this.enemies.filter(e => !e.isDead).map(e => ({
                 enemy: e, distSq: (this.player.x - e.x) ** 2 + (this.player.y - e.y) ** 2
             })).filter(t => t.distSq < this.player.atkRange * this.player.atkRange).sort((a, b) => a.distSq - b.distSq).slice(0, this.player.projCount);
@@ -480,6 +505,20 @@ export class Engine {
                         });
                     }, i * 100);
                 }
+            }
+        } else if (this.player.canShoot === false && now - this.player.lastAttack > this.player.getCurrentAtkCooldown()) {
+            const targets = this.enemies.filter(e => !e.isDead).map(e => ({
+                enemy: e, distSq: (this.player.x - e.x) ** 2 + (this.player.y - e.y) ** 2
+            })).filter(t => t.distSq < this.player.atkRange * this.player.atkRange).sort((a, b) => a.distSq - b.distSq);
+            if (targets.length > 0) {
+                const swing = targets[0].enemy;
+                this.player.lastAttack = now;
+                const dmg = this.player.getCurrentDamage();
+                swing.takeDamage(dmg);
+                this.damageNumbers.push(new DamageNumber(swing.x, swing.y, dmg, true));
+                this.spawnHitParticles(swing.x, swing.y, '#e74c3c', 8);
+                this.hitStop = 3;
+                soundManager.playSFX('hit', 0.2);
             }
         }
         const seconds = Math.floor(elapsedTime % 60);
@@ -540,6 +579,41 @@ export class Engine {
                 this.damageNumbers.push(new DamageNumber(e.x, e.y, 'NUKE', true));
             }
         });
+    }
+
+    shareRunSummary() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 720;
+        canvas.height = 720;
+        const ctx = canvas.getContext('2d');
+        // Background
+        const grd = ctx.createLinearGradient(0,0,720,720);
+        grd.addColorStop(0, '#0f2027');
+        grd.addColorStop(1, '#203a43');
+        ctx.fillStyle = grd;
+        ctx.fillRect(0,0,720,720);
+
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 48px Segoe UI';
+        ctx.textAlign = 'center';
+        ctx.fillText('TMXT RUN SUMMARY', 360, 80);
+
+        const statFont = keys.isMobile ? 24 : 28;
+        ctx.font = `bold ${statFont}px Segoe UI`;
+        const stats = [
+            `Time: ${this.finalTimeStr || document.getElementById('timer').innerText}`,
+            `Level: ${this.player.level}`,
+            `Kills: ${this.player.killCount}`,
+            `Total XP: ${Math.floor(this.player.totalXp)}`,
+            `Damage: ${Math.round(this.player.getCurrentDamage())}`,
+            `Projectiles: ${this.player.projCount}`
+        ];
+        stats.forEach((s, i) => ctx.fillText(s, 360, 160 + i * 50));
+
+        const link = document.createElement('a');
+        link.download = `tmxt-run-${Date.now()}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
     }
 
     updateStatsGrid(containerId) {
@@ -644,13 +718,16 @@ export class Engine {
         const mobileBtn3 = document.getElementById('btn-ability-3');
         if (mobileBtn1) mobileBtn1.innerText = 'CHARGE';
         if (mobileBtn2) {
-            mobileBtn2.innerText = 'INVINCUS';
+            mobileBtn2.innerText = 'INVICTUS';
             mobileBtn2.disabled = p.level < CONFIG.ABILITIES.INVINCIBLE.MIN_LEVEL;
         }
         if (mobileBtn3) {
             mobileBtn3.innerText = p.nukeCharges > 0 ? `NUKE (${p.nukeCharges})` : 'NUKE';
             mobileBtn3.disabled = !(p.level >= CONFIG.ABILITIES.NUKE.MIN_LEVEL && p.nukeCharges > 0);
         }
+
+        const shareBtn = document.getElementById('share-btn');
+        if (shareBtn) shareBtn.onclick = () => this.shareRunSummary();
     }
 
     spawnEnemy(difficulty, type = 'zombie') {

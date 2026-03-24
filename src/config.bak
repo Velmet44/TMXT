@@ -38,7 +38,17 @@
         HARD:        { label: 'HARD', hpMult: 0.8, enemyHp: 1.5, enemySpeed: 1.2, enemyDmg: 1.4, xpMult: 0.8, spawnRateMult: 0.8 },
         IMPOSSIBLE:  { label: 'IMPOSSIBLE', hpMult: 0.5, enemyHp: 3.0, enemySpeed: 1.5, enemyDmg: 2.5, xpMult: 0.5, spawnRateMult: 0.5 }
     },
-    LEVELING: { HP_PER_LEVEL: 5, DMG_PER_LEVEL: 1, SPD_PER_LEVEL: 0.05, ATK_COOLDOWN_MULT: 0.98, PROJ_INTERVAL: 1, PROJ_PER_INTERVAL: 1, XP_GROWTH_MULT: 1.3, XP_GROWTH_BASE: 10, ENERGY_PER_LEVEL: 5 },
+    LEVELING: {
+        HP_PER_LEVEL: 5,
+        DMG_PER_LEVEL: 1,
+        SPD_PER_LEVEL: 0.05,
+        ATK_COOLDOWN_MULT: 0.98,
+        PROJ_INTERVAL: 1,
+        PROJ_PER_INTERVAL: 1,
+        XP_GROWTH_MULT: 1.3,
+        XP_GROWTH_BASE: 10,
+        ENERGY_PER_LEVEL: 5
+    },
     PARTICLES: { MOBILE_MULT: 0.5, PC_MULT: 1.0 },
     CAMERA: { ZOOM_MOBILE: 0.7, ZOOM_PC: 1.0 },
     BULLET: { SPEED: 14, SIZE: 5, DAMAGE: 10 },
@@ -54,8 +64,8 @@
         }
     },
     CHARACTERS: [
-        { id: 1, name: 'RANGER-01', sprite: 'assets/char_1.svg', modifiers: { hp: 1.0, damage: 1.0, speed: 1.0, regen: 1.0, lifesteal: 1.0, projCount: 1.0, atkRange: 1.0, atkCooldown: 1.0, maxEnergy: 1.0, energyIdle: 1.0, energyWalk: 1.0, dashCost: 1.0, dashSpeed: 1.0, dashDuration: 1.0, abilityCost: 1.0, ability2Cost: 1.0, chargeupDuration: 1.0, invincibilityDuration: 1.0, invincibilitySpeedMult: 1.0, armor: 0.0, dashDamageMult: 0, dashParticle: '#f39c12', canShoot: true } },
-        { id: 2, name: 'BULWARK-02', sprite: 'assets/char_2.svg', modifiers: { hp: 1.8, damage: 1.5, speed: 0.8, regen: 1.2, lifesteal: 1.0, projCount: 0.0, atkRange: 0.8, atkCooldown: 1.1, maxEnergy: 1.2, energyIdle: 1.0, energyWalk: 1.0, dashCost: 0.8, dashSpeed: 1.2, dashDuration: 1.1, abilityCost: 1.0, ability2Cost: 1.0, chargeupDuration: 1.0, invincibilityDuration: 1.0, invincibilitySpeedMult: 1.2, armor: 0.2, dashDamageMult: 10, dashParticle: '#e74c3c', canShoot: false } }
+        { id: 1, name: 'RANGER-01', sprite: 'assets/char_1.svg', modifiers: { hp: 1.0, damage: 1.0, speed: 1.0, armor: 0.0, dashDamageMult: 0, dashParticle: '#f39c12', canShoot: true } },
+        { id: 2, name: 'BULWARK-02', sprite: 'assets/char_2.svg', modifiers: { hp: 1.6, damage: 10.0, speed: 0.9, armor: 0.2, dashDamageMult: 10, dashParticle: '#e74c3c', canShoot: false } }
     ],
     COLORS: {
         GRASS_1: '#2d5a27', GRASS_2: '#356a2e', GRASS_3: '#3b7533', BLOCK: '#4a4a4a', ZOMBIE: '#5d8a5a', ZOMBIE_CLOTHES: '#3e513c', SKELETON: '#ecf0f1', LADYBUG: '#e74c3c', XP: '#3498db', ENERGY: '#9b59b6', BULLET: '#f39c12', ARROW: '#bdc3c7', COMMON: '#bdc3c7', UNCOMMON: '#2ecc71', RARE: '#3498db', LEGENDARY: '#f1c40f'

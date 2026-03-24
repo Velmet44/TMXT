@@ -8,26 +8,43 @@ export class Player {
         this.y = y;
         this.size = CONFIG.PLAYER.SIZE;
 
-        // Base Stats
-        this.speed = CONFIG.PLAYER.SPEED;
-        this.maxHp = CONFIG.PLAYER.MAX_HP;
+        // Base stats for reset
+        this.base = {
+            speed: CONFIG.PLAYER.SPEED,
+            maxHp: CONFIG.PLAYER.MAX_HP,
+            regen: CONFIG.PLAYER.REGEN,
+            damage: CONFIG.PLAYER.DAMAGE,
+            atkCooldown: CONFIG.PLAYER.ATTACK_COOLDOWN,
+            atkRange: CONFIG.PLAYER.ATTACK_RANGE,
+            projCount: CONFIG.PLAYER.PROJ_COUNT,
+            maxEnergy: CONFIG.PLAYER.MAX_ENERGY
+        };
+
+        // Applied stats
+        this.speed = this.base.speed;
+        this.maxHp = this.base.maxHp;
         this.hp = this.maxHp;
-        this.regen = CONFIG.PLAYER.REGEN;
-        this.damage = CONFIG.PLAYER.DAMAGE;
-        this.atkCooldown = CONFIG.PLAYER.ATTACK_COOLDOWN;
-        this.atkRange = CONFIG.PLAYER.ATTACK_RANGE;
-        this.projCount = CONFIG.PLAYER.PROJ_COUNT;
+        this.regen = this.base.regen;
+        this.damage = this.base.damage;
+        this.atkCooldown = this.base.atkCooldown;
+        this.atkRange = this.base.atkRange;
+        this.projCount = this.base.projCount;
         
         // Progression
         this.level = 1;
         this.xp = 0;
         this.xpToNext = 10;
         this.totalXp = 0;
+        this.killCount = 0;
 
         // Energy
         this.maxEnergy = CONFIG.PLAYER.MAX_ENERGY;
         this.energy = this.maxEnergy;
         this.energyRegenMult = 1.0;
+        this.dashDamageMult = 0;
+        this.armor = 0;
+        this.dashParticle = '#f39c12';
+        this.canShoot = true;
 
         // State
         this.isDead = false;
@@ -65,8 +82,9 @@ export class Player {
 
     setCharacter(index) {
         this.characterIndex = index;
-        if (index) {
-            const imgPath = `assets/char_${index}.svg`;
+        const entry = CONFIG.CHARACTERS?.find(c => c.id === index) || CONFIG.CHARACTERS?.[0];
+        if (entry?.sprite) {
+            const imgPath = entry.sprite;
             if (this.sprite.src !== imgPath) {
                 this.spriteLoaded = false;
                 this.sprite = new Image();
@@ -74,7 +92,36 @@ export class Player {
                 this.sprite.src = imgPath;
             }
         }
-        // Optional: Character-specific base stat adjustments
+        const m = entry?.modifiers || {};
+        this.maxHp = Math.round(this.base.maxHp * (m.hp || 1));
+        this.hp = this.maxHp;
+        this.damage = this.base.damage * (m.damage || 1);
+        this.speed = this.base.speed * (m.speed || 1);
+        this.atkCooldown = this.base.atkCooldown * (m.atkCooldown || 1);
+        this.atkRange = this.base.atkRange * (m.atkRange || 1);
+        this.projCount = Math.max(0, Math.round(this.base.projCount * (m.projCount ?? 1)));
+        this.maxEnergy = this.base.maxEnergy * (m.maxEnergy || 1);
+        this.energy = this.maxEnergy;
+        this.armor = m.armor || 0;
+        this.dashDamageMult = m.dashDamageMult || 0;
+        this.dashParticle = m.dashParticle || '#f39c12';
+        this.canShoot = m.canShoot !== false;
+        if (!this.canShoot) {
+            this.projCount = 0;
+            this.atkRange = 80;
+        }
+        this.regen = this.base.regen * (m.regen || 1);
+        this.lifesteal = (this.base.lifesteal || 0) * (m.lifesteal || 1);
+        this.energyRegenMult = 1.0 * (m.energyIdle || 1); // idle regen mult
+        this.energyRegenWalkMult = m.energyWalk || 1;
+        this.dashCostMult = m.dashCost || 1;
+        this.dashSpeedMult = m.dashSpeed || 1;
+        this.dashDurationMult = m.dashDuration || 1;
+        this.abilityCostMult = m.abilityCost || 1;
+        this.ability2CostMult = m.ability2Cost || 1;
+        this.chargeupDurationMult = m.chargeupDuration || 1;
+        this.invincibilityDurationMult = m.invincibilityDuration || 1;
+        this.invincibilitySpeedMultBonus = m.invincibilitySpeedMult || 1;
     }
 
     addXP(amount) {
@@ -99,6 +146,8 @@ export class Player {
         this.damage += lv.DMG_PER_LEVEL;
         this.atkCooldown *= lv.ATK_COOLDOWN_MULT;
         this.speed += lv.SPD_PER_LEVEL;
+        this.maxEnergy += lv.ENERGY_PER_LEVEL;
+        this.energy = Math.min(this.maxEnergy, this.energy + lv.ENERGY_PER_LEVEL);
         if (lv.PROJ_INTERVAL > 0 && this.level % lv.PROJ_INTERVAL === 0) {
             this.projCount += lv.PROJ_PER_INTERVAL;
         }
@@ -110,10 +159,10 @@ export class Player {
 
     getCurrentSpeed() {
         let currentSpeed = this.speed;
-        if (this.isDashing) return CONFIG.PLAYER.DASH_SPEED;
+        if (this.isDashing) return CONFIG.PLAYER.DASH_SPEED * (this.dashSpeedMult || 1);
         
         if (this.isInvincible) {
-            currentSpeed *= CONFIG.PLAYER.INVINCIBILITY_SPEED_MULT;
+            currentSpeed *= CONFIG.PLAYER.INVINCIBILITY_SPEED_MULT * (this.invincibilitySpeedMultBonus || 1);
         } else {
             if (this.itemEffects.speedEndTime > Date.now()) currentSpeed *= 1.5;
             if (this.isChargedUp) currentSpeed *= 1.2;
@@ -180,7 +229,7 @@ export class Player {
             this.tilt += (0.1 - this.tilt) * 0.1;
             
             // Energy Regen while walking
-            this.energy = Math.min(this.maxEnergy, this.energy + CONFIG.PLAYER.ENERGY_REGEN_WALK * this.energyRegenMult);
+            this.energy = Math.min(this.maxEnergy, this.energy + CONFIG.PLAYER.ENERGY_REGEN_WALK * this.energyRegenMult * (this.energyRegenWalkMult || 1));
         } else {
             this.tilt *= 0.9;
             // Energy Regen while idle (faster)
@@ -188,10 +237,11 @@ export class Player {
         }
 
         // Dash Logic
-        if (keys.shift && !this.isDashing && this.energy >= CONFIG.PLAYER.DASH_COST) {
+        const dashCost = CONFIG.PLAYER.DASH_COST * (this.dashCostMult || 1);
+        if (keys.shift && !this.isDashing && this.energy >= dashCost) {
             this.isDashing = true;
-            this.dashEndTime = Date.now() + CONFIG.PLAYER.DASH_DURATION;
-            this.energy -= CONFIG.PLAYER.DASH_COST;
+            this.dashEndTime = Date.now() + CONFIG.PLAYER.DASH_DURATION * (this.dashDurationMult || 1);
+            this.energy -= dashCost;
         }
 
         if (this.isDashing && Date.now() > this.dashEndTime) {
@@ -199,10 +249,11 @@ export class Player {
         }
 
         // Ability 1 Logic (ChargeUp)
-        if (keys.z && !this.isChargedUp && this.level >= CONFIG.ABILITIES.CHARGE.MIN_LEVEL && this.energy >= CONFIG.PLAYER.ABILITY_COST) {
+        const chargeCost = CONFIG.PLAYER.ABILITY_COST * (this.abilityCostMult || 1);
+        if (keys.z && !this.isChargedUp && this.level >= CONFIG.ABILITIES.CHARGE.MIN_LEVEL && this.energy >= chargeCost) {
             this.isChargedUp = true;
-            this.chargeUpEndTime = Date.now() + CONFIG.PLAYER.CHARGEUP_DURATION;
-            this.energy -= CONFIG.PLAYER.ABILITY_COST;
+            this.chargeUpEndTime = Date.now() + CONFIG.PLAYER.CHARGEUP_DURATION * (this.chargeupDurationMult || 1);
+            this.energy -= chargeCost;
             if (!soundManager.playSFX('charge', 0.05)) soundManager.playSynth('crit');
         }
 
@@ -211,10 +262,11 @@ export class Player {
         }
 
         // Ability 2 Logic (Invincibility)
-        if (keys.x && !this.isInvincible && this.level >= CONFIG.ABILITIES.INVINCIBLE.MIN_LEVEL && this.energy >= CONFIG.PLAYER.ABILITY_2_COST) {
+        const invCost = CONFIG.PLAYER.ABILITY_2_COST * (this.ability2CostMult || 1);
+        if (keys.x && !this.isInvincible && this.level >= CONFIG.ABILITIES.INVINCIBLE.MIN_LEVEL && this.energy >= invCost) {
             this.isInvincible = true;
-            this.invincibilityEndTime = Date.now() + CONFIG.PLAYER.INVINCIBILITY_DURATION;
-            this.energy -= CONFIG.PLAYER.ABILITY_2_COST;
+            this.invincibilityEndTime = Date.now() + CONFIG.PLAYER.INVINCIBILITY_DURATION * (this.invincibilityDurationMult || 1);
+            this.energy -= invCost;
             if (!soundManager.playSFX('invincible', 0.05)) soundManager.playSynth('magnet');
         }
 
