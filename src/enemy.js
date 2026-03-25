@@ -15,7 +15,7 @@ export class Enemy {
         this.level = 1;
         this.levelUpTime = cfg.LEVEL_UP_TIME;
         
-        this.baseSpeed = cfg.SPEED * (0.9 + Math.random() * 0.2) * this.difficulty.enemySpeed;
+        this.baseSpeed = cfg.SPEED * (CONFIG.ENEMY.RUNTIME.SPEED_RAND_BASE + Math.random() * CONFIG.ENEMY.RUNTIME.SPEED_RAND_RANGE) * this.difficulty.enemySpeed;
         this.baseHp = cfg.HP * this.difficulty.enemyHp;
         this.baseDamage = cfg.DAMAGE * this.difficulty.enemyDmg;
         this.baseAttackCooldown = cfg.ATTACK_COOLDOWN;
@@ -53,7 +53,7 @@ export class Enemy {
         this.damage = this.baseDamage * Math.pow(scaling.DAMAGE, this.level - 1);
         
         // Attack Cooldown decreases with level (faster attacks)
-        this.attackCooldown = this.baseAttackCooldown * Math.pow(0.95, this.level - 1);
+        this.attackCooldown = this.baseAttackCooldown * Math.pow(CONFIG.ENEMY.DEFAULT.SCALING.ATTACK_CD, this.level - 1);
         
         if (this.hp !== undefined) {
             this.hp = (this.hp / prevMaxHp) * this.maxHp;
@@ -63,7 +63,7 @@ export class Enemy {
     update(player, camera, canvas, onAttack) {
         // Early exit for death while still letting death timer advance
         if (this.isDead) {
-            this.deathTimer += 0.05;
+            this.deathTimer += CONFIG.ENEMY.RUNTIME.DEATH_TIMER_STEP;
             return;
         }
 
@@ -75,13 +75,13 @@ export class Enemy {
         }
 
         if (this.stunUntil && Date.now() < this.stunUntil) {
-            this.frame += 0.05;
+            this.frame += CONFIG.ENEMY.RUNTIME.STUN_FRAME_STEP;
             return;
         }
 
         // Level up logic based on time since spawn
         this.levelTickCounter++;
-        const ticksPerLevel = 60 * (this.levelUpTime / 1000);
+        const ticksPerLevel = CONFIG.ENEMY.RUNTIME.LEVEL_TICKS_PER_SECOND * (this.levelUpTime / 1000);
         if (this.levelTickCounter >= ticksPerLevel) {
             if (this.level < this.maxLevel) {
                 this.level++;
@@ -101,10 +101,10 @@ export class Enemy {
         }
 
         const dist = Math.sqrt(distSq);
-        this.facing = dx > 0 ? 1 : -1;
+        this.facing = dx > CONFIG.ENEMY.RUNTIME.FACING_THRESHOLD ? 1 : -1;
 
         if (this.type === 'zombie' || this.type === 'exploder') {
-            if (dist > 5) {
+            if (dist > CONFIG.ENEMY.RUNTIME.MOVE_STOP_DIST) {
                 // Exploder moves faster but stops when exploding
                 const currentSpeed = (this.type === 'exploder' && this.isExploding) ? 0 : this.speed;
                 this.x += (dx / dist) * currentSpeed;
@@ -127,29 +127,29 @@ export class Enemy {
             if (dist > range) {
                 this.x += (dx / dist) * this.speed;
                 this.y += (dy / dist) * this.speed;
-            } else if (dist < range - 50) {
+            } else if (dist < range - CONFIG.ENEMY.RUNTIME.SKELETON_RETREAT_GAP) {
                 this.x -= (dx / dist) * this.speed;
                 this.y -= (dy / dist) * this.speed;
             }
 
             const now = Date.now();
-            if (dist < range + 50 && now - this.lastAttackTime > this.attackCooldown) {
+            if (dist < range + CONFIG.ENEMY.RUNTIME.SKELETON_ATTACK_BUFFER && now - this.lastAttackTime > this.attackCooldown) {
                 this.lastAttackTime = now;
                 if (onAttack) onAttack(this, player);
             }
         }
 
-        this.frame += 0.1;
+        this.frame += CONFIG.ENEMY.RUNTIME.FRAME_STEP;
         if (this.isHit) this.hitTimer++;
-        if (this.hitTimer > 10) { // Increased for better flash visibility
+        if (this.hitTimer > CONFIG.ENEMY.RUNTIME.HIT_FLASH_TICKS) {
             this.isHit = false;
             this.hitTimer = 0;
         }
 
         // Juice: Scale Pop decay
         if (this.scalePop > 0) {
-            this.scalePop *= 0.8;
-            if (this.scalePop < 0.01) this.scalePop = 0;
+            this.scalePop *= CONFIG.ENEMY.RUNTIME.SCALE_POP_DECAY;
+            if (this.scalePop < CONFIG.ENEMY.RUNTIME.SCALE_POP_MIN) this.scalePop = 0;
         }
 
         if (this.hp <= 0 && !this.isDead) {
@@ -173,7 +173,7 @@ export class Enemy {
         this.isHit = true;
         this.hitTimer = 0;
         // Visual 'pop' when hit
-        this.scalePop = 0.2;
+        this.scalePop = CONFIG.ENEMY.VISUAL.LEVEL_SCALE_PER_LEVEL * 2;
 
         // Allow death immediately while stunned so loot/xp can spawn
         if (this.hp <= 0 && !this.isDead) {
@@ -193,32 +193,32 @@ export class Enemy {
         if (this.isDead) {
             const alpha = Math.max(0, 1 - this.deathTimer);
             ctx.globalAlpha = alpha;
-            ctx.scale(1 + this.deathTimer, 1 - this.deathTimer * 0.5);
+            ctx.scale(CONFIG.ENEMY.VISUAL.DEATH_SCALE_X_GROWTH + this.deathTimer, 1 - this.deathTimer * CONFIG.ENEMY.VISUAL.DEATH_SCALE_Y_SHRINK);
         }
 
         if (this.stunUntil && Date.now() < this.stunUntil) {
-            ctx.globalAlpha = Math.max(0.4, ctx.globalAlpha * 0.7);
+            ctx.globalAlpha = Math.max(CONFIG.ENEMY.VISUAL.STUN_ALPHA_MIN, ctx.globalAlpha * CONFIG.ENEMY.VISUAL.STUN_ALPHA_MULT);
         }
 
         let mainColor = this.type === 'zombie' ? CONFIG.COLORS.ZOMBIE : (this.type === 'skeleton' ? CONFIG.COLORS.SKELETON : CONFIG.COLORS.LADYBUG);
-        let scale = (1 + (this.level - 1) * 0.1) * (1 + this.scalePop);
+        let scale = (1 + (this.level - 1) * CONFIG.ENEMY.VISUAL.LEVEL_SCALE_PER_LEVEL) * (1 + this.scalePop);
         
         // Exploder flashing
         if (this.isExploding) {
-            const flash = Math.sin(Date.now() * 0.02) > 0;
+            const flash = Math.sin(Date.now() * CONFIG.ENEMY.VISUAL.EXPLODER_FLASH_FREQ) > 0;
             if (flash) mainColor = '#fff';
-            scale *= 1.2;
+            scale *= CONFIG.ENEMY.VISUAL.EXPLODER_SCALE_MULT;
         }
 
         ctx.scale(this.facing * scale, scale);
 
-        const limp = Math.cos(this.frame * 0.5) * 4;
-        const sway = Math.sin(this.frame) * 3;
+        const limp = Math.cos(this.frame * CONFIG.ENEMY.VISUAL.LIMB_LIMP_FREQ) * CONFIG.ENEMY.VISUAL.LIMB_LIMP_AMPLITUDE;
+        const sway = Math.sin(this.frame) * CONFIG.ENEMY.VISUAL.LIMB_SWAY_AMPLITUDE;
 
         if (!keys.isMobile) {
-            ctx.fillStyle = 'rgba(0,0,0,0.15)';
+            ctx.fillStyle = `rgba(0,0,0,${CONFIG.ENEMY.VISUAL.SHADOW.ALPHA})`;
             ctx.beginPath();
-            ctx.ellipse(0, this.size/2, 10, 5, 0, 0, Math.PI * 2);
+            ctx.ellipse(0, this.size/2, CONFIG.ENEMY.VISUAL.SHADOW.RX, CONFIG.ENEMY.VISUAL.SHADOW.RY, 0, 0, Math.PI * 2);
             ctx.fill();
         }
 
@@ -226,16 +226,16 @@ export class Enemy {
             ctx.fillStyle = (this.level >= 7) ? '#1a1a1a' : CONFIG.COLORS.ZOMBIE_CLOTHES;
             ctx.fillRect(-this.size/2, 0, this.size, this.size/2);
             ctx.fillStyle = this.isHit ? '#fff' : mainColor;
-            ctx.fillRect(-this.size/2 - 2, -this.size/2 + limp, this.size + 4, this.size/2 + 2);
-            ctx.fillRect(this.size/2, -5 + sway + limp, 12, 6);
+            ctx.fillRect(-this.size/2 - CONFIG.ENEMY.VISUAL.ZOMBIE.HEAD_PAD, -this.size/2 + limp, this.size + CONFIG.ENEMY.VISUAL.ZOMBIE.HEAD_PAD * 2, this.size/2 + CONFIG.ENEMY.VISUAL.ZOMBIE.HEAD_PAD);
+            ctx.fillRect(this.size/2 + CONFIG.ENEMY.VISUAL.ZOMBIE.ARM_X, CONFIG.ENEMY.VISUAL.ZOMBIE.ARM_Y + sway + limp, CONFIG.ENEMY.VISUAL.ZOMBIE.ARM_W, CONFIG.ENEMY.VISUAL.ZOMBIE.ARM_H);
         } else if (this.type === 'skeleton') {
             ctx.fillStyle = this.isHit ? '#fff' : mainColor;
-            ctx.fillRect(-this.size/2 + 4, -this.size/2 + limp, this.size - 8, this.size);
-            ctx.fillRect(-this.size/2 + 2, -this.size/2 - 10 + limp, this.size - 4, 12);
+            ctx.fillRect(-this.size/2 + CONFIG.ENEMY.VISUAL.SKELETON.BODY_INSET_X, -this.size/2 + limp, this.size - CONFIG.ENEMY.VISUAL.SKELETON.BODY_INSET_Y, this.size);
+            ctx.fillRect(-this.size/2 + CONFIG.ENEMY.VISUAL.SKELETON.BODY_INSET_X / 2, -this.size/2 - CONFIG.ENEMY.VISUAL.SKELETON.HEAD_Y + limp, this.size - CONFIG.ENEMY.VISUAL.SKELETON.BODY_INSET_X, CONFIG.ENEMY.VISUAL.SKELETON.HEAD_H);
             ctx.strokeStyle = '#8e44ad';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = CONFIG.ENEMY.VISUAL.SKELETON.BOW_LINE;
             ctx.beginPath();
-            ctx.arc(this.size/2 + 5, limp, 10, -Math.PI/2, Math.PI/2);
+            ctx.arc(this.size/2 + CONFIG.ENEMY.VISUAL.SKELETON.BOW_X, limp, CONFIG.ENEMY.VISUAL.SKELETON.BOW_W, -Math.PI/2, Math.PI/2);
             ctx.stroke();
         } else if (this.type === 'exploder') {
             // Ladybug design
@@ -253,38 +253,38 @@ export class Enemy {
             // Spots
             ctx.fillStyle = '#1a1a1a';
             ctx.beginPath();
-            ctx.arc(-2, -3, 2, 0, Math.PI * 2);
-            ctx.arc(-2, 3, 2, 0, Math.PI * 2);
-            ctx.arc(-6, 0, 2, 0, Math.PI * 2);
+            ctx.arc(CONFIG.ENEMY.VISUAL.EXPLODER.SPOT_A, -CONFIG.ENEMY.VISUAL.EXPLODER.SPOT_B, CONFIG.ENEMY.VISUAL.EXPLODER.SPOT_R, 0, Math.PI * 2);
+            ctx.arc(CONFIG.ENEMY.VISUAL.EXPLODER.SPOT_A, CONFIG.ENEMY.VISUAL.EXPLODER.SPOT_B, CONFIG.ENEMY.VISUAL.EXPLODER.SPOT_R, 0, Math.PI * 2);
+            ctx.arc(CONFIG.ENEMY.VISUAL.EXPLODER.SPOT_C, 0, CONFIG.ENEMY.VISUAL.EXPLODER.SPOT_R, 0, Math.PI * 2);
             ctx.fill();
         }
 
         if (this.type !== 'exploder') {
             ctx.fillStyle = '#000';
-            ctx.fillRect(4, -8 + limp, 4, 4);
-            ctx.fillRect(-3, -8 + limp, 4, 4);
+            ctx.fillRect(CONFIG.ENEMY.VISUAL.EYES.R_X, CONFIG.ENEMY.VISUAL.EYES.Y + limp, CONFIG.ENEMY.VISUAL.EYES.SIZE, CONFIG.ENEMY.VISUAL.EYES.SIZE);
+            ctx.fillRect(CONFIG.ENEMY.VISUAL.EYES.L_X, CONFIG.ENEMY.VISUAL.EYES.Y + limp, CONFIG.ENEMY.VISUAL.EYES.SIZE, CONFIG.ENEMY.VISUAL.EYES.SIZE);
             ctx.fillStyle = '#ff0000';
-            ctx.fillRect(5, -7 + limp, 2, 2);
+            ctx.fillRect(CONFIG.ENEMY.VISUAL.EYES.RED_X, CONFIG.ENEMY.VISUAL.EYES.RED_Y + limp, CONFIG.ENEMY.VISUAL.EYES.RED_SIZE, CONFIG.ENEMY.VISUAL.EYES.RED_SIZE);
         }
 
         ctx.scale(1/(this.facing * scale), 1/scale);
         if (this.hp < this.maxHp && !this.isDead && this.type !== 'exploder') {
             const barW = this.size * scale;
-            const barH = 5;
+            const barH = CONFIG.ENEMY.VISUAL.HEALTH_BAR.H;
             ctx.fillStyle = '#000';
-            ctx.fillRect(-barW/2, - (this.size * scale) / 2 - 20, barW, barH);
+            ctx.fillRect(-barW/2, - (this.size * scale) / 2 - CONFIG.ENEMY.VISUAL.HEALTH_BAR.OFFSET_Y, barW, barH);
             ctx.fillStyle = (this.level >= 8) ? '#f1c40f' : '#2ecc71';
-            ctx.fillRect(-barW/2, - (this.size * scale) / 2 - 20, barW * (this.hp / this.maxHp), barH);
+            ctx.fillRect(-barW/2, - (this.size * scale) / 2 - CONFIG.ENEMY.VISUAL.HEALTH_BAR.OFFSET_Y, barW * (this.hp / this.maxHp), barH);
             ctx.fillStyle = '#fff';
-            ctx.font = `bold ${10 + this.level}px Segoe UI`;
+            ctx.font = `bold ${CONFIG.ENEMY.VISUAL.HEALTH_BAR.LEVEL_FONT_BASE + this.level}px Segoe UI`;
             ctx.textAlign = 'center';
-            ctx.fillText(`Lv.${this.level}`, 0, - (this.size * scale) / 2 - 25);
+            ctx.fillText(`Lv.${this.level}`, 0, - (this.size * scale) / 2 - CONFIG.ENEMY.VISUAL.HEALTH_BAR.LEVEL_TEXT_OFFSET_Y);
         }
 
         if (this.stunUntil && Date.now() < this.stunUntil) {
             ctx.fillStyle = '#9b59b6';
             ctx.beginPath();
-            ctx.arc(0, -this.size * 0.8, this.size * 0.3, 0, Math.PI * 2);
+            ctx.arc(0, -this.size * CONFIG.ENEMY.VISUAL.STUN_ORB.OFFSET_Y_MULT, this.size * CONFIG.ENEMY.VISUAL.STUN_ORB.SIZE_MULT, 0, Math.PI * 2);
             ctx.fill();
         }
 

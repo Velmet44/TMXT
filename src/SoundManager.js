@@ -1,3 +1,5 @@
+import { CONFIG } from './config.js';
+
 export class SoundManager {
     constructor() {
         this.ctx = null;
@@ -5,8 +7,8 @@ export class SoundManager {
         this.currentBgmName = null;
         this.sounds = {}; // AudioBuffers for SFX
         this.isMuted = false;
-        this.bgmVolume = 0.4;
-        this.sfxVolume = 0.5;
+        this.bgmVolume = CONFIG.AUDIO.DEFAULT_BGM_VOLUME;
+        this.sfxVolume = CONFIG.AUDIO.DEFAULT_SFX_VOLUME;
         this.wasPlayingBeforeHide = false;
         
         this.sfxFiles = ['shoot', 'hit', 'xp', 'lvlup', 'dash', 'kick', 'hurt', 'pickup', 'death', 'start', 'crit', 'magnet', 'nuke', 'charge', 'invincible'];
@@ -64,7 +66,7 @@ export class SoundManager {
         window.addEventListener('keydown', resume, { once: false });
     }
 
-    playSFX(name, pitchVar = 0.1) {
+    playSFX(name, pitchVar = CONFIG.AUDIO.SFX_DEFAULT_PITCH_VAR) {
         if (!this.ctx || !this.sounds[name]) return false;
         if (this.ctx.state === 'suspended') this.ctx.resume();
 
@@ -92,19 +94,15 @@ export class SoundManager {
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         const now = this.ctx.currentTime;
-        const tones = {
-            crit: 880,
-            magnet: 660,
-            nuke: 120
-        };
-        osc.frequency.value = tones[name] || 500;
-        gain.gain.setValueAtTime(this.sfxVolume * 0.6, now);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+        const tones = CONFIG.AUDIO.SYNTH_TONES;
+        osc.frequency.value = tones[name] || tones.default;
+        gain.gain.setValueAtTime(this.sfxVolume * CONFIG.AUDIO.DEFAULT_SYNTH_GAIN_MULT, now);
+        gain.gain.exponentialRampToValueAtTime(CONFIG.AUDIO.SYNTH_RAMP_END, now + CONFIG.AUDIO.SYNTH_RAMP_TIME);
         osc.type = name === 'nuke' ? 'sawtooth' : 'triangle';
         osc.connect(gain);
         gain.connect(this.ctx.destination);
         osc.start(now);
-        osc.stop(now + 0.3);
+        osc.stop(now + CONFIG.AUDIO.SYNTH_STOP_TIME);
     }
 
     async playBGM(name) {

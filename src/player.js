@@ -1,8 +1,9 @@
 import { CONFIG } from './config.js';
 import { keys } from './input.js';
 import { soundManager } from './SoundManager.js';
+import { getCharacterProfileById } from './characters/index.js';
 
-const getCharById = (id) => {
+const getCharConfigById = (id) => {
     const list = Object.values(CONFIG.CHARACTERS || {});
     return list.find(c => c.id === id) || list[0];
 };
@@ -11,19 +12,20 @@ export class Player {
     constructor(x, y) {
         this.x = x;
         this.y = y;
-        const defChar = getCharById(1);
+        const rt = CONFIG.PLAYER_RUNTIME;
+        const defChar = getCharConfigById(rt.DEFAULT_CHARACTER_ID);
         this.applyBase(defChar);
 
         // Progression
-        this.level = 1;
-        this.xp = 0;
-        this.xpToNext = 10;
-        this.totalXp = 0;
-        this.killCount = 0;
+        this.level = rt.INITIAL_LEVEL;
+        this.xp = rt.INITIAL_XP;
+        this.xpToNext = rt.INITIAL_XP_TO_NEXT;
+        this.totalXp = rt.INITIAL_TOTAL_XP;
+        this.killCount = rt.INITIAL_KILLS;
 
         // Energy
         this.energy = this.maxEnergy;
-        this.energyRegenMult = 1.0;
+        this.energyRegenMult = rt.ENERGY_REGEN_MULT;
         this.pendingStunDuration = 0;
         this.gravityWellActive = null;
 
@@ -59,12 +61,13 @@ export class Player {
     }
 
     applyBase(charCfg) {
+        this.characterProfile = getCharacterProfileById(charCfg.id);
         this.characterId = charCfg.id;
         this.charKey = Object.entries(CONFIG.CHARACTERS).find(([_, c]) => c === charCfg)?.[0];
         this.baseStats = { ...charCfg.base };
-        this.leveling = charCfg.leveling;
-        this.abilitiesCfg = charCfg.abilities;
-        this.upgrades = charCfg.upgrades || [];
+        this.leveling = this.characterProfile.leveling;
+        this.abilitiesCfg = this.characterProfile.abilities;
+        this.upgrades = this.characterProfile.upgrades || [];
         this.size = charCfg.base.SIZE;
 
         this.speed = charCfg.base.SPEED;
@@ -91,15 +94,20 @@ export class Player {
         this.invincibilitySpeedBase = charCfg.base.INVINCIBILITY_SPEED_MULT;
 
         this.dashDamageMult = 0;
+        this.dashRangeMult = 1;
         this.armor = 0;
         this.dashParticle = '#f39c12';
         this.canShoot = true;
     }
 
     setCharacter(id) {
-        const entry = getCharById(id);
+        const entry = getCharConfigById(id);
         if (!entry) return;
         this.applyBase(entry);
+        this.gravityWellActive = null;
+        this.pendingStunDuration = 0;
+        this.isChargedUp = false;
+        this.isInvincible = false;
 
         if (entry.sprite && this.sprite.src !== entry.sprite) {
             this.spriteLoaded = false;
@@ -119,6 +127,7 @@ export class Player {
         this.energy = this.maxEnergy;
         this.armor = m.armor || 0;
         this.dashDamageMult = m.dashDamageMult || 0;
+        this.dashRangeMult = m.dashRangeMult || 1;
         this.dashParticle = m.dashParticle || '#f39c12';
         this.canShoot = m.canShoot !== false;
         this.regen *= (m.regen || 1);
@@ -135,8 +144,8 @@ export class Player {
         this.invincibilitySpeedMultBonus = m.invincibilitySpeedMult || 1;
 
         if (!this.canShoot) {
-            this.projCount = 0;
-            this.atkRange = Math.max(this.atkRange, 80);
+            this.projCount = Math.max(1, this.projCount || 1);
+            this.atkRange = Math.max(this.atkRange, CONFIG.PLAYER_RUNTIME.MIN_MELEE_RANGE);
         }
     }
 
@@ -155,7 +164,8 @@ export class Player {
         this.level++;
         this.xp -= this.xpToNext;
         const lv = this.leveling;
-        this.xpToNext = Math.floor(this.xpToNext * lv.XP_GROWTH_MULT) + lv.XP_GROWTH_BASE;
+        this.xpToNext = Math.floor(this.xpToNext * lv.XP_GROWTH_MULT);
+        if (lv.XP_GROWTH_BASE) this.xpToNext += lv.XP_GROWTH_BASE;
 
         this.maxHp += lv.HP_PER_LEVEL;
         this.hp = Math.min(this.maxHp, this.hp + lv.HP_PER_LEVEL);
@@ -176,23 +186,23 @@ export class Player {
         if (this.isInvincible) {
             currentSpeed *= this.invincibilitySpeedBase * (this.invincibilitySpeedMultBonus || 1);
         } else {
-            if (this.itemEffects.speedEndTime > Date.now()) currentSpeed *= 1.5;
-            if (this.isChargedUp) currentSpeed *= 1.2;
+            if (this.itemEffects.speedEndTime > Date.now()) currentSpeed *= CONFIG.PLAYER_RUNTIME.SPEED_MULT_ITEM;
+            if (this.isChargedUp) currentSpeed *= CONFIG.PLAYER_RUNTIME.SPEED_MULT_CHARGE;
         }
         return currentSpeed;
     }
 
     getCurrentAtkCooldown() {
         let cd = this.atkCooldown;
-        if (this.itemEffects.rapidEndTime > Date.now()) cd *= 0.4;
-        if (this.isChargedUp) cd *= 0.5;
+        if (this.itemEffects.rapidEndTime > Date.now()) cd *= CONFIG.PLAYER_RUNTIME.ATK_CD_MULT_RAPID;
+        if (this.isChargedUp) cd *= CONFIG.PLAYER_RUNTIME.ATK_CD_MULT_CHARGE;
         return cd;
     }
 
     getCurrentDamage() {
         let dmg = this.damage;
-        if (this.isChargedUp) dmg *= 1.5;
-        if (this.isInvincible) dmg *= 2.0;
+        if (this.isChargedUp) dmg *= CONFIG.PLAYER_RUNTIME.DAMAGE_MULT_CHARGE;
+        if (this.isInvincible) dmg *= CONFIG.PLAYER_RUNTIME.DAMAGE_MULT_INVINCIBLE;
         return dmg;
     }
 
@@ -211,26 +221,26 @@ export class Player {
     update() {
         if (this.isDead) return;
         let mx = 0, my = 0;
-        if (keys.w) my -= 1;
-        if (keys.s) my += 1;
-        if (keys.a) mx -= 1;
-        if (keys.d) mx += 1;
+        if (keys.w) my -= CONFIG.PLAYER_RUNTIME.INPUT_STEP;
+        if (keys.s) my += CONFIG.PLAYER_RUNTIME.INPUT_STEP;
+        if (keys.a) mx -= CONFIG.PLAYER_RUNTIME.INPUT_STEP;
+        if (keys.d) mx += CONFIG.PLAYER_RUNTIME.INPUT_STEP;
         if (keys.mobileX !== 0 || keys.mobileY !== 0) {
             mx = keys.mobileX; my = keys.mobileY;
         }
         const dist = Math.sqrt(mx * mx + my * my);
-        if (dist > 0.1) {
+        if (dist > CONFIG.PLAYER_RUNTIME.INPUT_DEADZONE) {
             const speed = this.getCurrentSpeed();
             const moveX = (mx / dist) * speed;
             const moveY = (my / dist) * speed;
             this.x += moveX;
             this.y += moveY;
             this.rotation = Math.atan2(moveY, moveX);
-            this.walkTimer += 0.2;
-            this.tilt += (0.1 - this.tilt) * 0.1;
+            this.walkTimer += CONFIG.PLAYER_RUNTIME.WALK_TIMER_STEP;
+            this.tilt += (CONFIG.PLAYER_RUNTIME.TILT_TARGET - this.tilt) * CONFIG.PLAYER_RUNTIME.TILT_LERP;
             this.energy = Math.min(this.maxEnergy, this.energy + this.energyRegenWalkBase * this.energyRegenMult * (this.energyRegenWalkMult || 1));
         } else {
-            this.tilt *= 0.9;
+            this.tilt *= CONFIG.PLAYER_RUNTIME.TILT_IDLE_DAMP;
             this.energy = Math.min(this.maxEnergy, this.energy + this.energyRegenIdleBase * this.energyRegenMult);
         }
 
@@ -240,47 +250,27 @@ export class Player {
             this.dashEndTime = Date.now() + this.dashDurationBase * (this.dashDurationMult || 1);
             this.energy -= dashCost;
             this.lastDashTrail = Date.now();
-            soundManager.playSFX('dash', 0.05);
+            soundManager.playSFX('dash', CONFIG.PLAYER_RUNTIME.DASH_SFX_VOL);
         }
         if (this.isDashing && Date.now() > this.dashEndTime) this.isDashing = false;
 
         // Ability 1
         const chargeCfg = this.abilitiesCfg.CHARGE;
-        const fullEnergyCost = this.maxEnergy; // Abilities spend full bar
-        const chargeMinLevel = Math.max(3, chargeCfg.MIN_LEVEL || 3);
+        const fullEnergyCost = this.maxEnergy;
+        const chargeMinLevel = Math.max(CONFIG.PLAYER_RUNTIME.ABILITY_MIN_LEVEL, chargeCfg.MIN_LEVEL || CONFIG.PLAYER_RUNTIME.ABILITY_MIN_LEVEL);
         if (keys.z && !this.isChargedUp && this.level >= chargeMinLevel && this.energy >= fullEnergyCost) {
-            this.energy -= fullEnergyCost;
-            const dur = (chargeCfg.DURATION || this.chargeupDurationBase) * (this.chargeupDurationMult || 1);
-            this.isChargedUp = true;
-            this.chargeUpEndTime = Date.now() + dur;
-            if (chargeCfg.EFFECT === 'stun_all') {
-                this.pendingStunDuration = dur;
-            }
-            if (!soundManager.playSFX('charge', 0.05)) soundManager.playSynth('crit');
+            this.energy = 0;
+            if (this.characterProfile.castAbility1) this.characterProfile.castAbility1(this);
         }
         if (this.isChargedUp && Date.now() > this.chargeUpEndTime) this.isChargedUp = false;
 
         // Ability 2
         const invCfg = this.abilitiesCfg.INVINCIBLE;
-        const invMinLevel = Math.max(3, invCfg.MIN_LEVEL || 3);
-        if (keys.x && this.level >= invMinLevel && this.energy >= fullEnergyCost) {
-            this.energy -= fullEnergyCost;
-            const invDur = (invCfg.DURATION || this.invincibilityDurationBase) * (this.invincibilityDurationMult || 1);
-            if (invCfg.EFFECT === 'gravity_well') {
-                this.gravityWellActive = {
-                    center: { x: this.x, y: this.y },
-                    endTime: Date.now() + invDur,
-                    radius: invCfg.RADIUS || 240,
-                    pull: invCfg.PULL || 1.0,
-                    damage: invCfg.DAMAGE || this.getCurrentDamage() * 4,
-                    exploded: false
-                };
-                if (!soundManager.playSFX('gravity', 0.05)) soundManager.playSynth('magnet');
-            } else {
-                this.isInvincible = true;
-                this.invincibilityEndTime = Date.now() + invDur;
-                if (!soundManager.playSFX('invincible', 0.05)) soundManager.playSynth('magnet');
-            }
+        const invMinLevel = Math.max(CONFIG.PLAYER_RUNTIME.ABILITY_MIN_LEVEL, invCfg.MIN_LEVEL || CONFIG.PLAYER_RUNTIME.ABILITY_MIN_LEVEL);
+        const ability2Active = this.isInvincible || (this.gravityWellActive && !this.gravityWellActive.exploded);
+        if (keys.x && !ability2Active && this.level >= invMinLevel && this.energy >= fullEnergyCost) {
+            this.energy = 0;
+            if (this.characterProfile.castAbility2) this.characterProfile.castAbility2(this);
         }
         if (this.isInvincible && Date.now() > this.invincibilityEndTime) this.isInvincible = false;
         if (this.gravityWellActive && Date.now() > this.gravityWellActive.endTime && this.gravityWellActive.exploded) {
@@ -288,11 +278,11 @@ export class Player {
         }
 
         // Passive Regen
-        if (Date.now() - this.lastRegen > 1000) {
+        if (Date.now() - this.lastRegen > CONFIG.PLAYER_RUNTIME.REGEN_TICK_MS) {
             this.hp = Math.min(this.maxHp, this.hp + this.regen);
             this.lastRegen = Date.now();
         }
-        if (this.gunRecoil > 0) this.gunRecoil *= 0.8;
+        if (this.gunRecoil > 0) this.gunRecoil *= CONFIG.PLAYER_RUNTIME.GUN_RECOIL_DAMP;
     }
 
     attack(tx, ty) { this.lastAttack = Date.now(); }
@@ -300,31 +290,32 @@ export class Player {
     draw(ctx, camera) {
         const px = this.x - camera.x;
         const py = this.y - camera.y;
+        const vis = CONFIG.PLAYER_RUNTIME.VISUAL;
         ctx.save();
         ctx.translate(px, py);
-        const walkY = Math.sin(this.walkTimer) * 3;
-        const walkAngle = Math.cos(this.walkTimer) * 0.1;
+        const walkY = Math.sin(this.walkTimer) * vis.WALK_BOB_AMPLITUDE;
+        const walkAngle = Math.cos(this.walkTimer) * vis.WALK_ANGLE_AMPLITUDE;
         ctx.rotate(walkAngle);
         ctx.translate(0, walkY);
-        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.fillStyle = `rgba(0,0,0,${vis.SHADOW_ALPHA})`;
         ctx.beginPath();
-        ctx.ellipse(0, this.size/2, this.size/2, this.size/4, 0, 0, Math.PI*2);
+        ctx.ellipse(0, this.size/2, this.size/2, this.size*vis.SHADOW_RY_RATIO/2, 0, 0, Math.PI*2);
         ctx.fill();
         if (this.isInvincible) {
             ctx.strokeStyle = '#f1c40f';
-            ctx.lineWidth = 4;
+            ctx.lineWidth = vis.INV_RING_WIDTH;
             ctx.beginPath();
-            ctx.arc(0, 0, this.size * 0.8, 0, Math.PI * 2);
+            ctx.arc(0, 0, this.size * vis.INV_RING_SIZE_MULT, 0, Math.PI * 2);
             ctx.stroke();
-            ctx.fillStyle = 'rgba(241, 196, 15, 0.2)';
+            ctx.fillStyle = vis.INV_FILL;
             ctx.fill();
         }
         if (this.spriteLoaded) {
-            const scale = this.isInvincible ? 1.12 : (this.isChargedUp ? 1.05 : 1);
+            const scale = this.isInvincible ? vis.INV_SPRITE_SCALE : (this.isChargedUp ? vis.CHARGE_SPRITE_SCALE : 1);
             const size = this.size * scale;
             ctx.drawImage(this.sprite, -size / 2, -size / 2, size, size);
             if (this.isInvincible || this.isChargedUp) {
-                ctx.fillStyle = this.isInvincible ? 'rgba(241,196,15,0.35)' : 'rgba(155,89,182,0.35)';
+                ctx.fillStyle = this.isInvincible ? vis.SPRITE_BUFF_INV : vis.SPRITE_BUFF_CHARGE;
                 ctx.fillRect(-size / 2, -size / 2, size, size);
             }
         } else {
@@ -334,11 +325,11 @@ export class Player {
             else ctx.fillStyle = '#3498db';
             ctx.fillRect(-this.size/2, -this.size/2, this.size, this.size);
             ctx.fillStyle = '#fff';
-            const eyeSize = this.size * 0.2;
-            ctx.fillRect(-this.size/2 + 4, -this.size/4, eyeSize, eyeSize);
-            ctx.fillRect(this.size/2 - 4 - eyeSize, -this.size/4, eyeSize, eyeSize);
+            const eyeSize = this.size * vis.FALLBACK_EYE_SIZE_MULT;
+            ctx.fillRect(-this.size/2 + vis.FALLBACK_EYE_PAD, -this.size/4, eyeSize, eyeSize);
+            ctx.fillRect(this.size/2 - vis.FALLBACK_EYE_PAD - eyeSize, -this.size/4, eyeSize, eyeSize);
             ctx.fillStyle = this.isChargedUp ? '#e74c3c' : '#3498db';
-            ctx.fillRect(4, -1.5, 8, 2);
+            ctx.fillRect(vis.FALLBACK_MOUTH_X, vis.FALLBACK_MOUTH_Y, vis.FALLBACK_MOUTH_W, vis.FALLBACK_MOUTH_H);
             ctx.restore();
         }
         ctx.restore();

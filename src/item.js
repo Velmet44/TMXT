@@ -5,7 +5,7 @@ export class Item {
         this.x = x;
         this.y = y;
         this.type = type; // Object from CONFIG.ITEMS.TYPES
-        this.size = 12;
+        this.size = CONFIG.ITEMS.RUNTIME.SIZE;
         this.active = true;
         this.life = CONFIG.ITEMS.DESPAWN_TIME;
         this.bobOffset = Math.random() * Math.PI * 2;
@@ -16,7 +16,7 @@ export class Item {
     update(player, isMagnetActive) {
         if (!this.active) return false;
 
-        this.life -= 16; // Approx 60fps
+        this.life -= CONFIG.ITEMS.RUNTIME.LIFE_TICK;
         if (this.life <= 0) {
             this.active = false;
             return false;
@@ -36,7 +36,7 @@ export class Item {
         if (isMagnetActive && this.type.id !== 'magnet') {
             // Move towards player
             const dist = Math.sqrt(distSq);
-            const speed = 12;
+            const speed = CONFIG.ITEMS.RUNTIME.MAGNET_PULL_SPEED;
             this.vx = (dx / dist) * speed;
             this.vy = (dy / dist) * speed;
             this.x += this.vx;
@@ -64,16 +64,17 @@ export class Item {
         // If zoom is 0.5, we see more of the world.
         // We can just use large enough bounds to be safe, or pass zoom.
         // Let's assume a reasonable zoom range.
-        if (screenX < -100 || screenX > canvasW + 100 || 
-            screenY < -100 || screenY > canvasH + 100) return;
+        const margin = CONFIG.ITEMS.RUNTIME.OFFSCREEN_MARGIN;
+        if (screenX < -margin || screenX > canvasW + margin || 
+            screenY < -margin || screenY > canvasH + margin) return;
 
-        const bob = Math.sin(Date.now() / 200 + this.bobOffset) * 3;
+        const bob = Math.sin(Date.now() / CONFIG.ITEMS.RUNTIME.BOB_DIVISOR + this.bobOffset) * CONFIG.ITEMS.RUNTIME.BOB_AMPLITUDE;
 
         ctx.save();
         ctx.translate(screenX, screenY + bob);
         
         // Glow
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = CONFIG.ITEMS.RUNTIME.GLOW_BLUR;
         ctx.shadowColor = this.type.color;
 
         // Background Circle
@@ -84,10 +85,10 @@ export class Item {
 
         // Icon/Label
         ctx.fillStyle = '#fff';
-        ctx.font = '12px Arial';
+        ctx.font = CONFIG.ITEMS.RUNTIME.LABEL_FONT;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(this.type.label, 0, 1);
+        ctx.fillText(this.type.label, 0, CONFIG.ITEMS.RUNTIME.LABEL_Y_OFFSET);
 
         ctx.restore();
     }

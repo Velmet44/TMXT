@@ -15,8 +15,8 @@ export class XPOrb {
         const force = Math.random() * CONFIG.XP_ORB.EXPLOSION_FORCE;
         this.vx = Math.cos(angle) * force;
         this.vy = Math.sin(angle) * force;
-        this.friction = 0.95;
-        this.shineTimer = Math.random() * 10;
+        this.friction = CONFIG.XP_ORB.RUNTIME.FRICTION;
+        this.shineTimer = Math.random() * CONFIG.XP_ORB.RUNTIME.SHINE_INIT_MAX;
         this.sizePop = 0;
     }
 
@@ -34,7 +34,7 @@ export class XPOrb {
         const distSq = dx * dx + dy * dy;
         
         // Pickup range (using squared distance for performance)
-        const pickupRangeSq = (player.size / 2 + 10) ** 2;
+        const pickupRangeSq = (player.size / 2 + CONFIG.XP_ORB.RUNTIME.PICKUP_RADIUS_PAD) ** 2;
         if (distSq < pickupRangeSq) {
             this.active = false;
             return true;
@@ -44,15 +44,15 @@ export class XPOrb {
         if (forceMagnet || distSq < magnetDist * magnetDist) {
             const dist = Math.sqrt(distSq);
             // Stronger pull for global magnet
-            const pull = forceMagnet ? 15 : this.speed * (1 + (magnetDist - dist) / 50);
+            const pull = forceMagnet ? CONFIG.XP_ORB.RUNTIME.GLOBAL_PULL_SPEED : this.speed * (1 + (magnetDist - dist) / CONFIG.XP_ORB.RUNTIME.LOCAL_PULL_DIVISOR);
             
             this.x += (dx / dist) * pull;
             this.y += (dy / dist) * pull;
         }
-        this.shineTimer += 0.1;
+        this.shineTimer += CONFIG.XP_ORB.RUNTIME.SHINE_STEP;
         
         if (this.sizePop > 0) {
-            this.sizePop *= 0.9;
+            this.sizePop *= CONFIG.XP_ORB.RUNTIME.SIZE_POP_DAMP;
         }
 
         return false;
@@ -70,12 +70,12 @@ export class XPOrb {
             return;
         }
 
-        const shine = Math.sin(this.shineTimer) * 2;
+        const shine = Math.sin(this.shineTimer) * CONFIG.XP_ORB.RUNTIME.SHINE_AMPLITUDE;
         const currentSize = this.size + shine + this.sizePop;
 
         // Optimized Glow (Fast)
         ctx.fillStyle = CONFIG.COLORS.XP;
-        ctx.globalAlpha = 0.3;
+        ctx.globalAlpha = CONFIG.XP_ORB.RUNTIME.GLOW_ALPHA;
         ctx.beginPath();
         ctx.arc(sx, sy, currentSize, 0, Math.PI * 2);
         ctx.fill();
@@ -87,7 +87,7 @@ export class XPOrb {
         
         ctx.fillStyle = '#fff';
         ctx.beginPath();
-        ctx.arc(sx - 1, sy - 1, 1, 0, Math.PI * 2);
+        ctx.arc(sx - CONFIG.XP_ORB.RUNTIME.HIGHLIGHT_OFFSET, sy - CONFIG.XP_ORB.RUNTIME.HIGHLIGHT_OFFSET, CONFIG.XP_ORB.RUNTIME.HIGHLIGHT_SIZE, 0, Math.PI * 2);
         ctx.fill();
     }
 }
@@ -98,11 +98,11 @@ export class SlashParticle {
         this.y = y;
         this.color = color;
         this.angle = Math.random() * Math.PI * 2;
-        this.length = Math.random() * 100 + 50;
-        this.width = Math.random() * 2 + 1;
-        this.speed = Math.random() * 15 + 10;
-        this.life = 1.0;
-        this.decay = 0.05;
+        this.length = Math.random() * CONFIG.EFFECTS.SLASH.LENGTH_RANGE + CONFIG.EFFECTS.SLASH.LENGTH_MIN;
+        this.width = Math.random() * CONFIG.EFFECTS.SLASH.WIDTH_RANGE + CONFIG.EFFECTS.SLASH.WIDTH_MIN;
+        this.speed = Math.random() * CONFIG.EFFECTS.SLASH.SPEED_RANGE + CONFIG.EFFECTS.SLASH.SPEED_MIN;
+        this.life = CONFIG.EFFECTS.SLASH.LIFE;
+        this.decay = CONFIG.EFFECTS.SLASH.DECAY;
         this.vx = Math.cos(this.angle) * this.speed;
         this.vy = Math.sin(this.angle) * this.speed;
     }
@@ -134,23 +134,23 @@ export class Particle {
         this.y = y;
         this.color = color;
         const angle = Math.random() * Math.PI * 2;
-        const speed = Math.random() * 6 + 2;
+        const speed = Math.random() * CONFIG.EFFECTS.PARTICLE.BASE_SPEED_RANGE + CONFIG.EFFECTS.PARTICLE.BASE_SPEED_MIN;
         this.vx = Math.cos(angle) * speed;
         this.vy = Math.sin(angle) * speed;
-        this.life = 1.0;
-        this.decay = Math.random() * 0.03 + 0.01;
-        this.size = Math.random() * 6 + 2;
-        this.gravity = 0.15;
+        this.life = CONFIG.EFFECTS.SLASH.LIFE;
+        this.decay = Math.random() * CONFIG.EFFECTS.PARTICLE.BASE_DECAY_RANGE + CONFIG.EFFECTS.PARTICLE.BASE_DECAY_MIN;
+        this.size = Math.random() * CONFIG.EFFECTS.PARTICLE.BASE_SIZE_RANGE + CONFIG.EFFECTS.PARTICLE.BASE_SIZE_MIN;
+        this.gravity = CONFIG.EFFECTS.PARTICLE.BASE_GRAVITY;
         this.rotation = Math.random() * Math.PI * 2;
-        this.rotSpeed = (Math.random() - 0.5) * 0.2;
+        this.rotSpeed = (Math.random() - 0.5) * CONFIG.EFFECTS.PARTICLE.BASE_ROT_SPEED;
     }
 
     update() {
         this.x += this.vx;
         this.y += this.vy;
         this.vy += this.gravity;
-        this.vx *= 0.96;
-        this.vy *= 0.96;
+        this.vx *= CONFIG.EFFECTS.PARTICLE.BASE_VEL_DAMP;
+        this.vy *= CONFIG.EFFECTS.PARTICLE.BASE_VEL_DAMP;
         this.life -= this.decay;
         this.rotation += this.rotSpeed;
     }
@@ -172,11 +172,11 @@ export class Particle {
 export class BloodParticle extends Particle {
     constructor(x, y) {
         super(x, y, '#e74c3c');
-        this.decay = Math.random() * 0.02 + 0.005;
-        this.size = Math.random() * 8 + 4;
-        this.gravity = 0.25;
+        this.decay = Math.random() * CONFIG.EFFECTS.PARTICLE.BLOOD_DECAY_RANGE + CONFIG.EFFECTS.PARTICLE.BLOOD_DECAY_MIN;
+        this.size = Math.random() * CONFIG.EFFECTS.PARTICLE.BLOOD_SIZE_RANGE + CONFIG.EFFECTS.PARTICLE.BLOOD_SIZE_MIN;
+        this.gravity = CONFIG.EFFECTS.PARTICLE.BLOOD_GRAVITY;
         const angle = Math.random() * Math.PI * 2;
-        const speed = Math.random() * 8 + 4;
+        const speed = Math.random() * CONFIG.EFFECTS.PARTICLE.BLOOD_SPEED_RANGE + CONFIG.EFFECTS.PARTICLE.BLOOD_SPEED_MIN;
         this.vx = Math.cos(angle) * speed;
         this.vy = Math.sin(angle) * speed;
     }
@@ -201,14 +201,14 @@ export class DamageNumber {
         this.y = y;
         this.amount = amount;
         this.isCrit = isCrit;
-        this.vy = -2;
-        this.life = 1.0;
-        this.decay = 0.02;
+        this.vy = CONFIG.EFFECTS.FLOATING_TEXT.DAMAGE_VY;
+        this.life = CONFIG.EFFECTS.SLASH.LIFE;
+        this.decay = CONFIG.EFFECTS.FLOATING_TEXT.DAMAGE_DECAY;
     }
 
     update() {
         this.y += this.vy;
-        this.vy *= 0.95;
+        this.vy *= CONFIG.EFFECTS.FLOATING_TEXT.DAMAGE_VY_DAMP;
         this.life -= this.decay;
     }
 
@@ -217,7 +217,8 @@ export class DamageNumber {
         const sy = this.y - camera.y;
         if (!keys.isMobile) ctx.globalAlpha = this.life;
         ctx.fillStyle = this.isCrit ? '#f1c40f' : '#fff';
-        ctx.font = `bold ${this.isCrit ? (keys.isMobile ? 18 : 24) : (keys.isMobile ? 12 : 16)}px Segoe UI`;
+        const fontCfg = CONFIG.EFFECTS.FLOATING_TEXT.FONT;
+        ctx.font = `bold ${this.isCrit ? (keys.isMobile ? fontCfg.CRIT_MOBILE : fontCfg.CRIT_PC) : (keys.isMobile ? fontCfg.BASE_MOBILE : fontCfg.BASE_PC)}px Segoe UI`;
         ctx.textAlign = 'center';
         
         const text = typeof this.amount === 'number' ? Math.round(this.amount) : this.amount;
@@ -239,14 +240,14 @@ export class ItemLabel {
         this.y = y;
         this.text = text;
         this.color = color;
-        this.vy = -1.5;
-        this.life = 1.0;
-        this.decay = 0.02;
+        this.vy = CONFIG.EFFECTS.FLOATING_TEXT.ITEM_LABEL_VY;
+        this.life = CONFIG.EFFECTS.SLASH.LIFE;
+        this.decay = CONFIG.EFFECTS.FLOATING_TEXT.ITEM_LABEL_DECAY;
     }
 
     update() {
         this.y += this.vy;
-        this.vy *= 0.96;
+        this.vy *= CONFIG.EFFECTS.FLOATING_TEXT.ITEM_LABEL_VY_DAMP;
         this.life -= this.decay;
     }
 
@@ -256,7 +257,8 @@ export class ItemLabel {
         ctx.save();
         if (!keys.isMobile) ctx.globalAlpha = Math.max(0, this.life);
         ctx.fillStyle = this.color;
-        ctx.font = `bold ${keys.isMobile ? 12 : 16}px Segoe UI`;
+        const fontCfg = CONFIG.EFFECTS.FLOATING_TEXT.FONT;
+        ctx.font = `bold ${keys.isMobile ? fontCfg.BASE_MOBILE : fontCfg.BASE_PC}px Segoe UI`;
         ctx.textAlign = 'center';
         ctx.fillText(this.text, sx, sy);
         if (!keys.isMobile) ctx.globalAlpha = 1.0;

@@ -22,7 +22,7 @@ export const keys = {
 function checkIsMobile() {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
            ('ontouchstart' in window) || 
-           (window.innerWidth <= 1024 && window.innerHeight <= 1024);
+           (window.innerWidth <= CONFIG.INPUT.MOBILE_MAX_SIZE && window.innerHeight <= CONFIG.INPUT.MOBILE_MAX_SIZE);
 }
 
 keys.isMobile = checkIsMobile();
@@ -36,7 +36,7 @@ class Joystick {
         this.touchId = null;
         this.startPos = { x: 0, y: 0 };
         this.currentPos = { x: 0, y: 0 };
-        this.maxRadius = 60;
+        this.maxRadius = CONFIG.INPUT.JOYSTICK_RADIUS;
 
         if (this.container) {
             this.init();
@@ -224,7 +224,7 @@ if (startBtn) {
         // Update isMobile check on start to be sure
         keys.isMobile = checkIsMobile();
         if (keys.isMobile && mainMenu) {
-            mainMenu.style.transform = 'scale(0.9)';
+            mainMenu.style.transform = `scale(${CONFIG.INPUT.MENU_SCALE_MOBILE})`;
             mainMenu.style.transformOrigin = 'top center';
         }
         
