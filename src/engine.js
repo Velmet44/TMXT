@@ -1,4 +1,4 @@
-import { CONFIG, UPGRADES } from './config.js';
+import { CONFIG } from './config.js';
 import { Bullet } from './bullet.js';
 import { XPOrb, Particle, DamageNumber, SlashParticle, BloodParticle, ItemLabel } from './utils.js';
 import { Item } from './item.js';
@@ -31,12 +31,14 @@ export class Engine {
         this.wasAbility3Down = false;
         this.screenShake = 0;
         this.nukeFlash = 0;
+        this.stunFlash = 0;
+        this.gravityFlash = 0;
         this.hitStop = 0;
         this.playerHitFlash = 0;
-        this.zoomPulse = 0;
         this.particleMult = keys.isMobile ? CONFIG.PARTICLES.MOBILE_MULT : CONFIG.PARTICLES.PC_MULT;
         this.wasDashing = false;
         this.dashHitSet = new Set();
+        this.lastDashTrail = 0;
         
         soundManager.playBGM('menu');
         this.tileSize = keys.isMobile ? CONFIG.TILE_SIZE * 2 : CONFIG.TILE_SIZE;
@@ -229,6 +231,78 @@ export class Engine {
         if (this.player.isDashing) this.screenShake = Math.max(this.screenShake, 5);
         if (this.player.isChargedUp && Math.random() < 0.1) this.screenShake = Math.max(this.screenShake, 2);
         if (this.player.isInvincible) this.screenShake = Math.max(this.screenShake, 3);
+        if (this.player.isDashing && this.player.canShoot === false) {
+            const trailNow = Date.now();
+            if (trailNow - (this.lastDashTrail || 0) > 40) {
+                this.particles.push(new Particle(this.player.x, this.player.y, this.player.dashParticle || '#fff'));
+                this.lastDashTrail = trailNow;
+            }
+        }
+        if (this.player.pendingStunDuration) {
+            const now = Date.now();
+            const dur = this.player.pendingStunDuration;
+            const viewW = this.canvas.width / this.zoom;
+            const viewH = this.canvas.height / this.zoom;
+            this.screenShake = Math.max(this.screenShake, 10);
+            this.hitStop = Math.max(this.hitStop, 4);
+            this.stunFlash = 0.35;
+            for (let i = 0; i < 12; i++) {
+                const angle = (Math.PI * 2 * i) / 12;
+                const dist = 40 + Math.random() * 30;
+                const x = this.player.x + Math.cos(angle) * dist;
+                const y = this.player.y + Math.sin(angle) * dist;
+                this.particles.push(new SlashParticle(x, y, '#9b59b6'));
+            }
+            this.enemies.forEach(e => {
+                if (e.isDead) return;
+                if (e.x < this.camera.x - 100 || e.x > this.camera.x + viewW + 100) return;
+                if (e.y < this.camera.y - 100 || e.y > this.camera.y + viewH + 100) return;
+                e.stunUntil = Math.max(e.stunUntil || 0, now + dur);
+                this.spawnHitParticles(e.x, e.y, '#9b59b6', 8);
+            });
+            this.itemLabels.push(new ItemLabel(this.player.x, this.player.y - 50, 'STUN!', '#9b59b6'));
+            soundManager.playSFX('charge', 0.05);
+            this.player.pendingStunDuration = 0;
+        }
+
+        // Gravity Well (Bulwark ability 2)
+        if (this.player.gravityWellActive) {
+            const gw = this.player.gravityWellActive;
+            const now = Date.now();
+            const radiusSq = gw.radius * gw.radius;
+            this.screenShake = Math.max(this.screenShake, 6);
+            this.gravityFlash = Math.max(this.gravityFlash, 0.25);
+            this.enemies.forEach(e => {
+                if (e.isDead) return;
+                const dx = gw.center.x - e.x;
+                const dy = gw.center.y - e.y;
+                const distSq = dx*dx + dy*dy;
+                if (distSq < radiusSq * 1.4) {
+                    const dist = Math.sqrt(Math.max(1, distSq));
+                    const pull = gw.pull * (1 + (gw.radius - dist) / gw.radius);
+                    e.x += (dx / dist) * pull;
+                    e.y += (dy / dist) * pull;
+                    // Apply a soft stun/slow while in well
+                    e.stunUntil = Math.max(e.stunUntil || 0, now + 80);
+                    if (Math.random() < 0.05) this.particles.push(new SlashParticle(e.x, e.y, '#8e44ad'));
+                }
+            });
+            if (!gw.exploded && now >= gw.endTime) {
+                gw.exploded = true;
+                this.screenShake = Math.max(this.screenShake, 16);
+                for (let i = 0; i < 20; i++) this.particles.push(new SlashParticle(gw.center.x, gw.center.y, '#f1c40f'));
+                this.enemies.forEach(e => {
+                    if (e.isDead) return;
+                    const dx = gw.center.x - e.x;
+                    const dy = gw.center.y - e.y;
+                    if (dx*dx + dy*dy <= radiusSq) {
+                        e.takeDamage(gw.damage);
+                        this.damageNumbers.push(new DamageNumber(e.x, e.y, Math.round(gw.damage), true));
+                        this.spawnHitParticles(e.x, e.y, '#f1c40f', 8);
+                    }
+                });
+            }
+        }
         if (this.player.isDashing) {
             this.enemies.forEach(enemy => {
                 if (enemy.isDead) return;
@@ -242,6 +316,8 @@ export class Engine {
                     if (dmg > 0) {
                         enemy.takeDamage(dmg);
                         this.spawnHitParticles(enemy.x, enemy.y, this.player.dashParticle || '#fff', 6);
+                        this.screenShake = Math.max(this.screenShake, 12);
+                        soundManager.playSFX('dash', 0.1);
                         this.damageNumbers.push(new DamageNumber(enemy.x, enemy.y, dmg, true));
                         this.dashHitSet.add(enemy);
                     }
@@ -249,7 +325,8 @@ export class Engine {
             });
         }
         // Ability 3 (Nuke) activation: level gate 10 and requires stored charge
-        if (keys.c && !this.wasAbility3Down && this.player.level >= CONFIG.ABILITIES.NUKE.MIN_LEVEL && this.player.nukeCharges > 0) {
+        const nukeMin = this.player.abilitiesCfg?.NUKE?.MIN_LEVEL ?? 10;
+        if (keys.c && !this.wasAbility3Down && this.player.level >= nukeMin && this.player.nukeCharges > 0) {
             this.activateNuke();
         }
         this.wasAbility3Down = keys.c;
@@ -258,15 +335,14 @@ export class Engine {
 
         const targetCamX = this.player.x - (this.canvas.width / 2) / this.zoom;
         const targetCamY = this.player.y - (this.canvas.height / 2) / this.zoom;
-        this.camera.x += (targetCamX - this.camera.x) * CONFIG.PLAYER.LERP;
-        this.camera.y += (targetCamY - this.camera.y) * CONFIG.PLAYER.LERP;
+        const lerp = this.player.baseStats?.LERP || 0.1;
+        this.camera.x += (targetCamX - this.camera.x) * lerp;
+        this.camera.y += (targetCamY - this.camera.y) * lerp;
 
         if (this.screenShake > 0) {
             this.screenShake *= 0.9;
             if (this.screenShake < 0.1) this.screenShake = 0;
         }
-        if (this.zoomPulse > 0) this.zoomPulse *= 0.9;
-
         if (this.nukeFlash > 0) this.nukeFlash -= 0.05;
 
         const now = Date.now();
@@ -368,8 +444,7 @@ export class Engine {
                                 this.hitStop = 2;
                                 this.screenShake = Math.max(this.screenShake, 15);
                                 if (!soundManager.playSFX('crit', 0.05)) soundManager.playSynth('crit');
-                                soundManager.playSFX('hit', 0.15);
-                                this.zoomPulse = Math.min(0.2, this.zoomPulse + 0.05);
+                                soundManager.playSFX('hit', 0.15); 
                             } else {
                                 soundManager.playSFX('hit', 0.05);
                             }
@@ -401,10 +476,15 @@ export class Engine {
                     case 'health':
                         this.player.hp = Math.min(this.player.maxHp, this.player.hp + type.value);
                         labelText = '+HP'; break;
-                    case 'nuke':
-        this.player.nukeCharges = Math.min(CONFIG.ABILITIES.NUKE.MAX_CHARGES, (this.player.nukeCharges || 0) + 1);
-                        labelText = 'NUKE READY'; 
+                    case 'nuke': {
+                        const nukeCfg = this.player.abilitiesCfg?.NUKE || {};
+                        if (this.player.level >= (nukeCfg.MIN_LEVEL ?? 10)) {
+                            const maxNuke = nukeCfg.MAX_CHARGES ?? 3;
+                            this.player.nukeCharges = Math.min(maxNuke, (this.player.nukeCharges || 0) + 1);
+                            labelText = 'NUKE READY';
+                        }
                         break;
+                    }
                     case 'speed':
                         this.player.itemEffects.speedEndTime = Date.now() + type.duration;
                         labelText = '+SPEED'; break;
@@ -466,7 +546,8 @@ export class Engine {
                             roll -= type.chance;
                         }
                         if (selectedType) {
-                            if (selectedType.id === 'nuke' && this.player.level < CONFIG.ABILITIES.NUKE.MIN_LEVEL) selectedType = null;
+                            const nukeMin = this.player.abilitiesCfg?.NUKE?.MIN_LEVEL ?? 10;
+                            if (selectedType.id === 'nuke' && this.player.level < nukeMin) selectedType = null;
                             if (selectedType && !visibleTypes.has(selectedType.id)) {
                                 this.items.push(new Item(e.x, e.y, selectedType));
                             }
@@ -516,8 +597,11 @@ export class Engine {
                 const dmg = this.player.getCurrentDamage();
                 swing.takeDamage(dmg);
                 this.damageNumbers.push(new DamageNumber(swing.x, swing.y, dmg, true));
-                this.spawnHitParticles(swing.x, swing.y, '#e74c3c', 8);
+                this.spawnHitParticles(swing.x, swing.y, '#e74c3c', 10);
+                this.spawnHitParticles(swing.x, swing.y, '#fff', 4);
                 this.hitStop = 3;
+                this.screenShake = Math.max(this.screenShake, 8);
+                if (this.player.lifesteal) this.player.hp = Math.min(this.player.maxHp, this.player.hp + dmg * this.player.lifesteal);
                 soundManager.playSFX('hit', 0.2);
             }
         }
@@ -535,15 +619,20 @@ export class Engine {
         this.isPaused = true;
         this.pauseStartTime = Date.now();
         this.screenShake = 15;
-        this.zoomPulse = Math.min(0.2, this.zoomPulse + 0.08);
         this.damageNumbers.push(new DamageNumber(this.player.x, this.player.y - 60, 'LEVEL UP!', true));
         soundManager.playSFX('lvlup');
         if (this.player.godMode) this.player.hp = this.player.maxHp;
         const screen = document.getElementById('level-up-screen');
         const list = document.getElementById('upgrade-list');
         list.innerHTML = '';
-        const shuffled = [...UPGRADES].sort(() => 0.5 - Math.random());
-        const selected = shuffled.slice(0, 3);
+        const pool = this.player.upgrades || [];
+        if (!pool.length) {
+            this.isPaused = false;
+            screen.classList.add('hidden');
+            return;
+        }
+        const shuffled = [...pool].sort(() => 0.5 - Math.random());
+        const selected = shuffled.slice(0, Math.min(3, shuffled.length));
         selected.forEach(upg => {
             const card = document.createElement('div');
             card.className = `upgrade-card ${upg.rarity}`;
@@ -568,13 +657,15 @@ export class Engine {
     }
 
     activateNuke() {
+        const nukeCfg = this.player.abilitiesCfg?.NUKE || {};
         this.player.nukeCharges -= 1;
-        this.screenShake = CONFIG.ABILITIES.NUKE.SCREEN_SHAKE;
-        this.nukeFlash = CONFIG.ABILITIES.NUKE.FLASH_ALPHA;
+        this.screenShake = nukeCfg.SCREEN_SHAKE ?? 50;
+        this.nukeFlash = nukeCfg.FLASH_ALPHA ?? 1.0;
         if (!soundManager.playSFX('nuke', 0.05)) soundManager.playSynth('nuke');
+        const nukeDmg = nukeCfg.DAMAGE ?? 9999;
         this.enemies.forEach(e => {
             if (!e.isDead) {
-                e.takeDamage(CONFIG.ABILITIES.NUKE.DAMAGE);
+                e.takeDamage(nukeDmg);
                 for(let j=0; j<3; j++) this.particles.push(new SlashParticle(e.x, e.y, '#fff'));
                 this.damageNumbers.push(new DamageNumber(e.x, e.y, 'NUKE', true));
             }
@@ -653,59 +744,76 @@ export class Engine {
         document.getElementById('hp-text').innerText = `HP: ${Math.ceil(p.hp)} / ${p.maxHp}`;
         document.getElementById('energy-text').innerText = `ENERGY: ${Math.floor(p.energy)} / ${p.maxEnergy}`;
 
+        const abilities = p.abilitiesCfg || {};
+        const chargeCfg = abilities.CHARGE || {};
+        const invCfg = abilities.INVINCIBLE || {};
+        const nukeCfg = abilities.NUKE || {};
+        const chargeDur = (chargeCfg.DURATION || p.chargeupDurationBase) * (p.chargeupDurationMult || 1);
+        const chargeCost = p.maxEnergy;
+        const invDur = (invCfg.DURATION || p.invincibilityDurationBase) * (p.invincibilityDurationMult || 1);
+        const invCost = p.maxEnergy;
+        const chargeName = chargeCfg.EFFECT === 'stun_all' ? 'STUN' : 'CHARGE';
+        const invName = invCfg.EFFECT === 'gravity_well' ? 'GRAV WELL' : 'INVICTUS';
+
         const slot1 = document.getElementById('ability-1');
         const cooldown1 = document.getElementById('ability-cooldown-1');
-        if (p.level >= 5) {
-            slot1.classList.remove('locked');
-            if (p.isChargedUp) {
-                const remaining = (p.chargeUpEndTime - Date.now()) / CONFIG.PLAYER.CHARGEUP_DURATION;
-                cooldown1.style.height = `${(1 - remaining) * 100}%`;
-                slot1.style.borderColor = '#e74c3c';
-            } else {
+        if (slot1 && cooldown1) {
+            slot1.querySelector('.ability-name').innerText = chargeName;
+            if (p.level >= Math.max(3, chargeCfg.MIN_LEVEL ?? 3)) {
+                slot1.classList.remove('locked');
+                if (p.isChargedUp) {
+                    const remaining = (p.chargeUpEndTime - Date.now()) / chargeDur;
+                    cooldown1.style.height = `${(1 - remaining) * 100}%`;
+                    slot1.style.borderColor = '#e74c3c';
+                } else {
                 cooldown1.style.height = '0%';
-                slot1.style.borderColor = p.energy >= CONFIG.PLAYER.ABILITY_COST ? '#9b59b6' : '#555';
+                slot1.style.borderColor = p.energy >= chargeCost ? '#9b59b6' : '#555';
             }
         } else {
             slot1.classList.add('locked');
-            cooldown1.style.height = '100%';
+                cooldown1.style.height = '100%';
+            }
         }
 
         const slot2 = document.getElementById('ability-2');
         const cooldown2 = document.getElementById('ability-cooldown-2');
-        // Always visible; unlocks at level 8
-        slot2.classList.remove('empty');
-        slot2.querySelector('.ability-name').innerText = p.level >= 8 ? 'INVICTUS' : 'INVICTUS (LVL 8)';
-        if (p.level >= 8) {
-            slot2.classList.remove('locked');
-            if (p.isInvincible) {
-                const remaining = (p.invincibilityEndTime - Date.now()) / CONFIG.PLAYER.INVINCIBILITY_DURATION;
-                cooldown2.style.height = `${(1 - remaining) * 100}%`;
-                slot2.style.borderColor = '#f1c40f';
+        if (slot2 && cooldown2) {
+            slot2.classList.remove('empty');
+            slot2.querySelector('.ability-name').innerText = invName;
+            if (p.level >= Math.max(3, invCfg.MIN_LEVEL ?? 3)) {
+                slot2.classList.remove('locked');
+                const activeGravity = invCfg.EFFECT === 'gravity_well' && p.gravityWellActive;
+                if (p.isInvincible || activeGravity) {
+                    const remaining = activeGravity ? (p.gravityWellActive.endTime - Date.now()) / invDur : (p.invincibilityEndTime - Date.now()) / invDur;
+                    cooldown2.style.height = `${(1 - remaining) * 100}%`;
+                    slot2.style.borderColor = invCfg.EFFECT === 'gravity_well' ? '#8e44ad' : '#f1c40f';
+                } else {
+                    cooldown2.style.height = '0%';
+                    slot2.style.borderColor = p.energy >= invCost ? (invCfg.EFFECT === 'gravity_well' ? '#8e44ad' : '#f1c40f') : '#555';
+                }
             } else {
-                cooldown2.style.height = '0%';
-                slot2.style.borderColor = p.energy >= CONFIG.PLAYER.ABILITY_2_COST ? '#f1c40f' : '#555';
+                slot2.classList.add('locked');
+                cooldown2.style.height = '100%';
+                slot2.style.borderColor = '#555';
             }
-        } else {
-            slot2.classList.add('locked');
-            cooldown2.style.height = '100%';
-            slot2.style.borderColor = '#555';
         }
 
-        // Ability 3 (NUKE) appears at lvl threshold, requires charge
         const slot3 = document.getElementById('ability-3');
         const cooldown3 = document.getElementById('ability-cooldown-3');
-        slot3.classList.remove('empty');
-        slot3.querySelector('.ability-name').innerText = 'NUKE';
-        if (p.level >= CONFIG.ABILITIES.NUKE.MIN_LEVEL) {
-            slot3.classList.remove('locked');
-            const ready = p.nukeCharges > 0;
-            slot3.style.borderColor = ready ? '#f1c40f' : '#555';
-            cooldown3.style.height = ready ? '0%' : '100%';
-            if (ready) slot3.querySelector('.ability-name').innerText = `NUKE (${p.nukeCharges})`;
-        } else {
-            slot3.classList.add('locked');
-            slot3.style.borderColor = '#555';
-            cooldown3.style.height = '100%';
+        if (slot3 && cooldown3) {
+            slot3.classList.remove('empty');
+            slot3.querySelector('.ability-name').innerText = 'NUKE';
+            if (p.level >= (nukeCfg.MIN_LEVEL ?? 10)) {
+                slot3.classList.remove('locked');
+                const ready = p.nukeCharges > 0;
+                slot3.style.borderColor = ready ? '#f1c40f' : '#555';
+                cooldown3.style.height = ready ? '0%' : '100%';
+                if (ready) slot3.querySelector('.ability-name').innerText = `NUKE (${p.nukeCharges})`;
+            } else {
+                slot3.classList.add('locked');
+                slot3.style.borderColor = '#555';
+                cooldown3.style.height = '100%';
+            }
         }
 
         // Ability 4 remains placeholder
@@ -716,14 +824,14 @@ export class Engine {
         const mobileBtn1 = document.getElementById('btn-ability-1');
         const mobileBtn2 = document.getElementById('btn-ability-2');
         const mobileBtn3 = document.getElementById('btn-ability-3');
-        if (mobileBtn1) mobileBtn1.innerText = 'CHARGE';
+        if (mobileBtn1) mobileBtn1.innerText = chargeName;
         if (mobileBtn2) {
-            mobileBtn2.innerText = 'INVICTUS';
-            mobileBtn2.disabled = p.level < CONFIG.ABILITIES.INVINCIBLE.MIN_LEVEL;
+            mobileBtn2.innerText = invName;
+            mobileBtn2.disabled = p.level < Math.max(3, (invCfg.MIN_LEVEL ?? 3));
         }
         if (mobileBtn3) {
             mobileBtn3.innerText = p.nukeCharges > 0 ? `NUKE (${p.nukeCharges})` : 'NUKE';
-            mobileBtn3.disabled = !(p.level >= CONFIG.ABILITIES.NUKE.MIN_LEVEL && p.nukeCharges > 0);
+            mobileBtn3.disabled = !(p.level >= (nukeCfg.MIN_LEVEL ?? 10) && p.nukeCharges > 0);
         }
 
         const shareBtn = document.getElementById('share-btn');
@@ -746,8 +854,7 @@ export class Engine {
             this.ctx.translate(sx, sy);
         }
         this.ctx.clearRect(-50, -50, this.canvas.width + 100, this.canvas.height + 100);
-        const zoomScale = this.zoom * (1 + this.zoomPulse);
-        this.ctx.scale(zoomScale, zoomScale);
+        this.ctx.scale(this.zoom, this.zoom);
         this.drawBackground();
         this.xpOrbs.forEach(o => o.draw(this.ctx, this.camera));
         this.items.forEach(i => i.draw(this.ctx, this.camera));
@@ -763,6 +870,16 @@ export class Engine {
             this.ctx.fillStyle = `rgba(231, 76, 60, ${this.playerHitFlash * 0.3})`;
             this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
             this.playerHitFlash *= 0.9;
+        }
+        if (this.stunFlash > 0) {
+            this.ctx.fillStyle = `rgba(155, 89, 182, ${this.stunFlash})`;
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            this.stunFlash *= 0.85;
+        }
+        if (this.gravityFlash > 0) {
+            this.ctx.fillStyle = `rgba(142, 68, 173, ${this.gravityFlash})`;
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            this.gravityFlash *= 0.85;
         }
         if (this.nukeFlash > 0) {
             this.ctx.fillStyle = `rgba(255, 255, 255, ${this.nukeFlash})`;

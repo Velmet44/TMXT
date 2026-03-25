@@ -1,3 +1,4 @@
+import { CONFIG } from './config.js';
 import { soundManager } from './SoundManager.js';
 
 export const keys = {
@@ -172,30 +173,38 @@ const charNameDisp = document.getElementById('char-name');
 const prevBtn = document.getElementById('prev-char');
 const nextBtn = document.getElementById('next-char');
 
-let currentCharIndex = 1;
-const totalChars = 2;
+const charList = Object.values(CONFIG.CHARACTERS || {});
+let currentCharIndex = charList[0]?.id || 1;
+const totalChars = charList.length || 1;
 
 function updateCharPreview() {
-    if (charPreview) charPreview.src = `assets/char_${currentCharIndex}.svg`;
-    if (charNameDisp) charNameDisp.innerText = `UNIT ${currentCharIndex.toString().padStart(2, '0')}`;
+    const idx = charList.findIndex(c => c.id === currentCharIndex);
+    const entry = idx >= 0 ? charList[idx] : charList[0];
+    if (!entry) return;
+    if (charPreview) charPreview.src = entry.sprite || `assets/char_${entry.id}.svg`;
+    if (charNameDisp) charNameDisp.innerText = entry.name || `UNIT ${entry.id.toString().padStart(2, '0')}`;
 }
 
 if (prevBtn) {
     prevBtn.addEventListener('click', () => {
-        currentCharIndex = currentCharIndex > 1 ? currentCharIndex - 1 : totalChars;
+        const idx = charList.findIndex(c => c.id === currentCharIndex);
+        const newIdx = idx > 0 ? idx - 1 : charList.length - 1;
+        currentCharIndex = charList[newIdx]?.id || currentCharIndex;
         updateCharPreview();
     });
 }
 
 if (nextBtn) {
     nextBtn.addEventListener('click', () => {
-        currentCharIndex = currentCharIndex < totalChars ? currentCharIndex + 1 : 1;
+        const idx = charList.findIndex(c => c.id === currentCharIndex);
+        const newIdx = idx < charList.length - 1 ? idx + 1 : 0;
+        currentCharIndex = charList[newIdx]?.id || currentCharIndex;
         updateCharPreview();
     });
 }
 
 keys.currentDifficulty = 'NORMAL';
-keys.selectedCharIndex = 1;
+keys.selectedCharIndex = currentCharIndex;
 
 updateCharPreview();
 

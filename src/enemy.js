@@ -61,8 +61,21 @@ export class Enemy {
     }
 
     update(player, camera, canvas, onAttack) {
+        // Early exit for death while still letting death timer advance
         if (this.isDead) {
             this.deathTimer += 0.05;
+            return;
+        }
+
+        // Enemies should still die even when stunned; handle health before stun return
+        if (this.hp <= 0 && !this.isDead) {
+            this.isDead = true;
+            this.deathTimer = 0;
+            return;
+        }
+
+        if (this.stunUntil && Date.now() < this.stunUntil) {
+            this.frame += 0.05;
             return;
         }
 
@@ -161,6 +174,13 @@ export class Enemy {
         this.hitTimer = 0;
         // Visual 'pop' when hit
         this.scalePop = 0.2;
+
+        // Allow death immediately while stunned so loot/xp can spawn
+        if (this.hp <= 0 && !this.isDead) {
+            this.hp = 0;
+            this.isDead = true;
+            this.deathTimer = 0;
+        }
     }
 
     draw(ctx, camera) {
@@ -174,6 +194,10 @@ export class Enemy {
             const alpha = Math.max(0, 1 - this.deathTimer);
             ctx.globalAlpha = alpha;
             ctx.scale(1 + this.deathTimer, 1 - this.deathTimer * 0.5);
+        }
+
+        if (this.stunUntil && Date.now() < this.stunUntil) {
+            ctx.globalAlpha = Math.max(0.4, ctx.globalAlpha * 0.7);
         }
 
         let mainColor = this.type === 'zombie' ? CONFIG.COLORS.ZOMBIE : (this.type === 'skeleton' ? CONFIG.COLORS.SKELETON : CONFIG.COLORS.LADYBUG);
@@ -255,6 +279,13 @@ export class Enemy {
             ctx.font = `bold ${10 + this.level}px Segoe UI`;
             ctx.textAlign = 'center';
             ctx.fillText(`Lv.${this.level}`, 0, - (this.size * scale) / 2 - 25);
+        }
+
+        if (this.stunUntil && Date.now() < this.stunUntil) {
+            ctx.fillStyle = '#9b59b6';
+            ctx.beginPath();
+            ctx.arc(0, -this.size * 0.8, this.size * 0.3, 0, Math.PI * 2);
+            ctx.fill();
         }
 
         ctx.restore();
