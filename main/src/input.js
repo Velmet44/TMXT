@@ -163,7 +163,6 @@ function requestMobileOptimizations() {
 
 // Mobile Initialization & Button Handling
 const mainMenu = document.getElementById('main-menu');
-const cgMenu = document.getElementById('cg-menu');
 const startBtn = document.getElementById('start-btn');
 const diffBtns = document.querySelectorAll('.diff-btn');
 
@@ -235,7 +234,6 @@ if (startBtn) {
         }
         
         if (mainMenu) mainMenu.classList.add('hidden');
-        if (cgMenu) cgMenu.classList.add('hidden');
     });
 }
 
@@ -273,7 +271,8 @@ abilityKeys.forEach((key, index) => {
 window.addEventListener('resize', () => {
     keys.isMobile = checkIsMobile();
     const mobileControls = document.getElementById('mobile-controls');
-    if (keys.isMobile && mainMenu && mainMenu.classList.contains('hidden') && cgMenu && cgMenu.classList.contains('hidden')) {
+    if (keys.isMobile && mainMenu && mainMenu.classList.contains('hidden')) {
         if (mobileControls) mobileControls.classList.remove('hidden');
     }
 });
+

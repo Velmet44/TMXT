@@ -45,9 +45,9 @@ export class XPOrb {
             const dist = Math.sqrt(distSq);
             // Stronger pull for global magnet
             const pull = forceMagnet ? CONFIG.XP_ORB.RUNTIME.GLOBAL_PULL_SPEED : this.speed * (1 + (magnetDist - dist) / CONFIG.XP_ORB.RUNTIME.LOCAL_PULL_DIVISOR);
-            
-            this.x += (dx / dist) * pull;
-            this.y += (dy / dist) * pull;
+            const safeDist = Math.max(CONFIG.XP_ORB.RUNTIME.MIN_PULL_DIST, dist);
+            this.x += (dx / safeDist) * pull;
+            this.y += (dy / safeDist) * pull;
         }
         this.shineTimer += CONFIG.XP_ORB.RUNTIME.SHINE_STEP;
         

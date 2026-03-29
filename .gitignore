@@ -1,11 +1,7 @@
-# Ignore everything by default
+# Track only the game project under main/
 *
+!main/
+!main/**
 
-# Unignore specific directories and files
-!*/
-!assets/**
-!css/**
-!src/**
-TMXT-CG/
-!index.html
+# Keep ignore rules themselves tracked
 !.gitignore

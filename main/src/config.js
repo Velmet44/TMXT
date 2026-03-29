@@ -1,5 +1,5 @@
 // Single source of truth for gameplay tuning.
-// Main build: src/config.js | CG build: TMXT-CG/src/config.js (sync via sync_config_to_cg.bat).
+// Main build canonical configuration file.
 // Shared level-up options used by every character unless overridden in CHARACTER_PROFILES.
 const sharedUpgrades = [
     { id: 'hp', name: 'Vitality', desc: '+20 Max HP', rarity: 'common', icon: '\u2764', apply: (p) => { p.maxHp += 20; p.hp += 20; } },
@@ -35,7 +35,7 @@ const bulwarkUpgrades = [
 export const CONFIG = {
     // Global world/camera tuning.
     WORLD: {
-        TILE_SIZE: 64,
+        TILE_SIZE: 32,
         TILE_SIZE_MOBILE_MULT: 2,
         CAMERA: { ZOOM_MOBILE: 0.7, ZOOM_PC: 1.0 },
         PARTICLES: { MOBILE_MULT: 0.5, PC_MULT: 1.0 }
@@ -101,7 +101,7 @@ export const CONFIG = {
         SYNTH_RAMP_TIME: 0.25,
         SYNTH_STOP_TIME: 0.3,
         SFX_DEFAULT_PITCH_VAR: 0.1,
-        SYNTH_TONES: { crit: 880, magnet: 660, nuke: 120, default: 500 }
+        SYNTH_TONES: { crit: 880, magnet: 660, leech: 520, nuke: 120, default: 500 }
     },
     // Bullet travel and rendering values.
     BULLET: {
@@ -116,6 +116,9 @@ export const CONFIG = {
         FRAME_STEP: 0.2,
         TRAIL_LENGTH: 5,
         TRAIL_ALPHA: 0.35,
+        RUNTIME: {
+            MIN_AIM_DIST: 0.0001
+        },
         ENEMY_ARROW: { BODY_W: 20, BODY_H: 2, BODY_X: -10, BODY_Y: -1, TIP_X: 10, WING_X: 5, WING_Y: 3 },
         PLAYER_VISUAL: { PULSE_AMPLITUDE: 2, OUTER_ALPHA: 0.4, OUTER_LEN_MULT: 6, OUTER_WIDTH_MULT: 7, CORE_LEN_MULT: 3 },
         TRAIL_MIN_WIDTH: 1
@@ -126,6 +129,7 @@ export const CONFIG = {
         ZOMBIE: { SPEED: 1.8, HP: 30, SIZE: 28, DAMAGE: 12, RANGE: 5, ATTACK_COOLDOWN: 400, XP_BASE: 5, XP_MAX: 200, ENERGY_DROP: 5, LEVEL_UP_TIME: 8000, SPAWN_TIME: 0, SPAWN_WEIGHT: 1.0, SPAWN_RATE: 1500 },
         SKELETON: { SPEED: 1.2, HP: 20, SIZE: 26, DAMAGE: 15, PROJ_SPEED: 8, RANGE: 300, ATTACK_COOLDOWN: 2000, XP_BASE: 15, XP_MAX: 300, ENERGY_DROP: 10, LEVEL_UP_TIME: 12000, SPAWN_TIME: 60, SPAWN_WEIGHT: 0.4 },
         EXPLODER: { SPEED: 8, HP: 25, SIZE: 18, DAMAGE: 40, RANGE: 40, ATTACK_COOLDOWN: 500, XP_BASE: 20, XP_MAX: 400, ENERGY_DROP: 15, LEVEL_UP_TIME: 10000, SPAWN_TIME: 120, SPAWN_WEIGHT: 0.2 },
+        LEECHLING: { SPEED: 2.6, HP: 18, SIZE: 20, DAMAGE: 8, RANGE: 5, ATTACK_COOLDOWN: 650, XP_BASE: 10, XP_MAX: 240, ENERGY_DROP: 7, LEVEL_UP_TIME: 11000, SPAWN_TIME: 180, SPAWN_WEIGHT: 0.25 },
         RUNTIME: {
             SPEED_RAND_BASE: 0.9,
             SPEED_RAND_RANGE: 0.2,
@@ -136,10 +140,13 @@ export const CONFIG = {
             SCALE_POP_DECAY: 0.8,
             SCALE_POP_MIN: 0.01,
             LEVEL_TICKS_PER_SECOND: 60,
+            MIN_MOVE_DIST: 1,
             FACING_THRESHOLD: 0,
             MOVE_STOP_DIST: 5,
             SKELETON_RETREAT_GAP: 50,
-            SKELETON_ATTACK_BUFFER: 50
+            SKELETON_ATTACK_BUFFER: 50,
+            LEECH_ENERGY_DRAIN: 15,
+            LEECH_HEAL_PER_ENERGY: 0.5
         },
         VISUAL: {
             DEATH_SCALE_X_GROWTH: 1.0,
@@ -156,16 +163,17 @@ export const CONFIG = {
             ZOMBIE: { HEAD_PAD: 2, ARM_W: 12, ARM_H: 6, ARM_X: 0, ARM_Y: -5 },
             SKELETON: { BODY_INSET_X: 4, BODY_INSET_Y: 8, HEAD_Y: 10, HEAD_H: 12, BOW_W: 10, BOW_X: 5, BOW_LINE: 2 },
             EXPLODER: { SPOT_R: 2, SPOT_A: -2, SPOT_B: 3, SPOT_C: -6 },
+            LEECHLING: { BODY_R_X: 0.55, BODY_R_Y: 0.45, CORE_R: 0.22, FANG_Y: 0.05, FANG_W: 0.18, FANG_H: 0.25 },
             EYES: { Y: -8, SIZE: 4, L_X: -3, R_X: 4, RED_X: 5, RED_Y: -7, RED_SIZE: 2 },
             HEALTH_BAR: { H: 5, OFFSET_Y: 20, LEVEL_TEXT_OFFSET_Y: 25, LEVEL_FONT_BASE: 10 },
             STUN_ORB: { OFFSET_Y_MULT: 0.8, SIZE_MULT: 0.3 }
         }
     },
     // Difficulty scaling over run-time.
-    SPAWN_SCALING: { PER_MINUTE_MULT: 3, MIN_SPAWN_INTERVAL: 40 },
+    SPAWN_SCALING: { PER_MINUTE_MULT: 3, MIN_SPAWN_INTERVAL: 40, HP_MULT_PER_MINUTE: 2 },
     // XP orb motion, pickup behavior, and rendering.
     XP_ORB: {
-        SIZE: 6,
+        SIZE: 7,
         MAGNET_DIST: 250,
         SPEED: 10,
         EXPLOSION_FORCE: 6,
@@ -175,6 +183,7 @@ export const CONFIG = {
             FRICTION: 0.95,
             SHINE_INIT_MAX: 10,
             PICKUP_RADIUS_PAD: 10,
+            MIN_PULL_DIST: 1,
             GLOBAL_PULL_SPEED: 15,
             LOCAL_PULL_DIVISOR: 50,
             SHINE_STEP: 0.1,
@@ -187,19 +196,20 @@ export const CONFIG = {
     },
     // World item drops and per-item effect payloads.
     ITEMS: {
-        DROP_CHANCE: 0.05,
+        DROP_CHANCE: 0.1,
         DESPAWN_TIME: 30000,
         TYPES: {
             MAGNET: { id: 'magnet', color: '#9b59b6', duration: 8000, label: '\uD83E\uDDF2', chance: 0.15 },
             HEALTH: { id: 'health', color: '#e74c3c', value: 30, label: '\u2764', chance: 0.20 },
-            NUKE: { id: 'nuke', color: '#f1c40f', label: '\u2622', chance: 0.15 },
-            SPEED: { id: 'speed', color: '#2ecc71', duration: 10000, value: 1.5, label: '\u26A1', chance: 0.30 },
+            NUKE: { id: 'nuke', color: '#f1c40f', label: '\u2622', chance: 0.20 },
+            SPEED: { id: 'speed', color: '#2ecc71', duration: 10000, value: 1.5, label: '\u26A1', chance: 0.25 },
             RAPID: { id: 'rapid', color: '#e67e22', duration: 8000, value: 0.4, label: '\uD83C\uDFF9', chance: 0.20 }
         },
         RUNTIME: {
             SIZE: 12,
             LIFE_TICK: 16,
             MAGNET_PULL_SPEED: 12,
+            MIN_PULL_DIST: 1,
             OFFSCREEN_MARGIN: 100,
             BOB_DIVISOR: 200,
             BOB_AMPLITUDE: 3,
@@ -250,7 +260,7 @@ export const CONFIG = {
     },
     // Core combat/runtime behavior used by engine.js.
     ENGINE: {
-        AUTH_MODAL_CLOSE_DELAY_MS: 1000,
+        ABILITY_ERROR_DURATION_MS: 1200,
         CAMERA_LERP_FALLBACK: 0.1,
         SHAKE: { DASH: 5, CHARGED_CHANCE: 0.1, CHARGED_VALUE: 2, INVINCIBLE: 3, DAMP: 0.9, MIN: 0.1 },
         DASH_TRAIL_INTERVAL_MS: 40,
@@ -278,7 +288,10 @@ export const CONFIG = {
             SPARK_CHANCE: 0.05,
             EXPLOSION_SHAKE: 16,
             EXPLOSION_SLASH_COUNT: 20,
-            EXPLOSION_PARTICLES: 8
+            EXPLOSION_PARTICLES: 8,
+            KILL_RADIUS_MULT: 0.18,
+            PULL_CURVE_POWER: 1.35,
+            SCREEN_FLASH_WHILE_ACTIVE: 0.07
         },
         DASH_HIT: { PARTICLES: 6, SHAKE: 12, SFX_VOL: 0.1 },
         NukeActivation: { DEFAULT_MIN_LEVEL: 3 },
@@ -287,7 +300,26 @@ export const CONFIG = {
         PLAYER_BULLET_HIT: { SHAKE: 15, FLASH: 1.0, BLOOD_COUNT: 8 },
         EXPLODER_HIT: { RANGE: 80, SHAKE: 25, FLASH: 1.0, HITSTOP: 5, BLOOD_COUNT: 15 },
         CONTACT_HIT: { SHAKE: 10, FLASH: 1.0, HITSTOP: 2, BLOOD_COUNT: 5 },
-        CRIT: { DAMAGE_MULT: 2, HITSTOP: 2, SHAKE: 15, SFX_CRIT_VOL: 0.05, SFX_HIT_VOL: 0.15 },
+        LEECH_HIT: {
+            PARTICLES: 8,
+            SPAWN_PARTICLES: 6,
+            SFX_VOL: 0.06,
+            LABEL_COLOR: '#9b59b6',
+            LABEL_OFFSET_Y: 26,
+            PARTICLE_COLOR: '#7bed9f',
+            BURST_COLOR: '#9b59b6'
+        },
+        CRIT: {
+            DAMAGE_MULT: 2,
+            HITSTOP: 2,
+            SHAKE: 15,
+            SFX_CRIT_VOL: 0.05,
+            SFX_HIT_VOL: 0.15,
+            PULSE_INTENSITY: 1,
+            PULSE_DECAY: 0.04,
+            PULSE_COLOR: '#f1c40f',
+            PULSE_RADIUS_MULT: 1.6
+        },
         HIT_SFX_VOL: 0.05,
         ITEM_LABEL_OFFSET_Y: 40,
         XP: { ENDGAME_THRESHOLD: 10000, ENDGAME_MULT: 10, ORB_SPLIT_DIVISOR: 10, LEVEL_SCALING_DIVISOR: 7 },
@@ -302,17 +334,7 @@ export const CONFIG = {
         STATS: { ATK_SPEED_FACTOR: 1000 },
         LEVELUP: { SHAKE: 15, LABEL_OFFSET_Y: 60, OPTIONS: 3 },
         SCREEN_FLASH: { PLAYER_HIT_ALPHA_MULT: 0.3, PLAYER_HIT_DAMP: 0.9, STUN_DAMP: 0.85, GRAVITY_DAMP: 0.85, NUKE_DAMP: 0.05 },
-        RENDER: { CLEAR_MARGIN: 50, TILE_PAD_START: 1, TILE_PAD_END: 2, TILE_SEED_A: 12.9898, TILE_SEED_B: 78.233, TILE_SEED_MUL: 43758.5453, TILE_BLEND_1: 0.8, TILE_BLEND_2: 0.95, BLOCK_CHANCE: 0.05, BLOCK_SIZE_MULT: 0.125, BLOCK_OFFSET_MULT: 0.3125 },
-        // CrazyGames-only settings (kept here so both builds read from one source of truth).
-        CG: {
-            PROGRESS_KEY: 'tmxt_progress',
-            REVIVE: {
-                COUNTDOWN_SECONDS: 5,
-                CLEAR_DAMAGE: 9999,
-                FLASH_ALPHA: 0.5,
-                SHAKE: 20
-            }
-        }
+        RENDER: { CLEAR_MARGIN: 50, TILE_PAD_START: 1, TILE_PAD_END: 2, TILE_SEED_A: 12.9898, TILE_SEED_B: 78.233, TILE_SEED_MUL: 43758.5453, TILE_BLEND_1: 0.8, TILE_BLEND_2: 0.95, BLOCK_CHANCE: 0.05, BLOCK_SIZE_MULT: 0.125, BLOCK_OFFSET_MULT: 0.3125 }
     },
     // Difficulty presets visible in menus.
     DIFFICULTIES: {
@@ -331,6 +353,7 @@ export const CONFIG = {
         ZOMBIE_CLOTHES: '#3e513c',
         SKELETON: '#ecf0f1',
         LADYBUG: '#e74c3c',
+        LEECHLING: '#7bed9f',
         XP: '#3498db',
         ENERGY: '#9b59b6',
         BULLET: '#f39c12',
@@ -352,9 +375,10 @@ export const CONFIG = {
             upgradeSet: 'SHARED',
             leveling: { HP_PER_LEVEL: 5, DMG_PER_LEVEL: 1, SPD_PER_LEVEL: 0.05, ATK_COOLDOWN_MULT: 0.98, PROJ_INTERVAL: 1, PROJ_PER_INTERVAL: 1, XP_GROWTH_MULT: 2.0, XP_GROWTH_BASE: 0, ENERGY_PER_LEVEL: 5 },
             abilities: {
-                CHARGE: { MIN_LEVEL: 3, COST: 100, DURATION: 10000, EFFECT: 'self_charge' },
-                INVINCIBLE: { MIN_LEVEL: 3, COST: 160, DURATION: 6000, SPEED_MULT: 2.5 },
-                NUKE: { MIN_LEVEL: 3, MAX_CHARGES: 3, DAMAGE: 9999, SCREEN_SHAKE: 50, FLASH_ALPHA: 1.0 }
+                ABILITY_1: { NAME: 'CHARGE', ICON: '\u26A1', COLOR: '#9b59b6', MIN_LEVEL: 3, DURATION: 10000, EFFECT: 'self_charge' },
+                ABILITY_2: { NAME: 'INVICTUS', ICON: '\uD83D\uDEE1', COLOR: '#f1c40f', MIN_LEVEL: 3, DURATION: 6000, SPEED_MULT: 2.5, EFFECT: 'invincible' },
+                ABILITY_3: { NAME: 'NUKE', ICON: '\u2622', COLOR: '#f1c40f', MIN_LEVEL: 3, DAMAGE: 9999, SCREEN_SHAKE: 50, FLASH_ALPHA: 1.0, EFFECT: 'nuke' },
+                ABILITY_4: { NAME: 'ZERO FRAME', ICON: '\uD83C\uDF00', COLOR: '#00d1ff', MIN_LEVEL: 3, DURATION: 5000, RADIUS: 260, ENEMY_SPEED_MULT: 0.45, ENEMY_PROJ_SPEED_MULT: 0.5, PLAYER_PROJ_SPEED_MULT: 1.8, EFFECT: 'zero_frame' }
             }
         },
         char_2: {
@@ -362,9 +386,10 @@ export const CONFIG = {
             upgradeSet: 'BULWARK',
             leveling: { HP_PER_LEVEL: 7, DMG_PER_LEVEL: 1.5, SPD_PER_LEVEL: 0.04, ATK_COOLDOWN_MULT: 0.99, PROJ_INTERVAL: 2, PROJ_PER_INTERVAL: 0, XP_GROWTH_MULT: 2.0, XP_GROWTH_BASE: 0, ENERGY_PER_LEVEL: 6 },
             abilities: {
-                CHARGE: { MIN_LEVEL: 3, COST: 100, DURATION: 10000, EFFECT: 'stun_all' },
-                INVINCIBLE: { MIN_LEVEL: 3, COST: 160, DURATION: 2800, EFFECT: 'gravity_well', RADIUS: 260, PULL: 1.2, DAMAGE: 320 },
-                NUKE: { MIN_LEVEL: 3, MAX_CHARGES: 3, DAMAGE: 9999, SCREEN_SHAKE: 50, FLASH_ALPHA: 1.0 }
+                ABILITY_1: { NAME: 'STUN SURGE', ICON: '\u26A1', COLOR: '#9b59b6', MIN_LEVEL: 3, DURATION: 10000, EFFECT: 'stun_all' },
+                ABILITY_2: { NAME: 'BLACKHOLE CORE', ICON: '\uD83D\uDEE1', COLOR: '#1f2430', MIN_LEVEL: 3, DURATION: 2800, EFFECT: 'gravity_well', RADIUS: 220, PULL: 2.1, DAMAGE: 99999, TARGET_VISIBLE: false },
+                ABILITY_3: { NAME: 'SHOCKWAVE SLAM', ICON: '\uD83D\uDCA5', COLOR: '#e67e22', MIN_LEVEL: 3, EFFECT: 'shockwave', DAMAGE: 360, RADIUS: 320, KNOCKBACK: 140, VULNERABLE_MULT: 1.35, VULNERABLE_MS: 5000, STUN_MS: 400 },
+                ABILITY_4: { NAME: 'CITADEL MODE', ICON: '\uD83E\uDDF1', COLOR: '#95a5a6', MIN_LEVEL: 3, EFFECT: 'citadel', DURATION: 7000, RANGE_MULT: 2.4, ATTACK_BONUS: 3, ATK_COOLDOWN_MULT: 0.75 }
             }
         }
     },
@@ -375,7 +400,7 @@ export const CONFIG = {
             name: 'RANGER-01',
             sprite: 'assets/char_1.svg',
             base: {
-                SIZE: 32,
+                SIZE: 42,
                 LERP: 0.1,
                 SPEED: 4,
                 MAX_HP: 100,
@@ -391,22 +416,20 @@ export const CONFIG = {
                 DASH_COST: 30,
                 DASH_SPEED: 25,
                 DASH_DURATION: 150,
-                ABILITY_COST: 100,
                 CHARGEUP_DURATION: 10000,
-                ABILITY_2_COST: 160,
                 INVINCIBILITY_DURATION: 6000,
                 INVINCIBILITY_SPEED_MULT: 2.5
             },
-            modifiers: { hp: 1.0, damage: 1.0, speed: 1.0, regen: 1.0, lifesteal: 1.0, projCount: 1.0, atkRange: 1.0, atkCooldown: 1.0, maxEnergy: 1.0, energyIdle: 1.0, energyWalk: 1.0, dashCost: 1.0, dashSpeed: 1.0, dashDuration: 1.0, abilityCost: 1.0, ability2Cost: 1.0, chargeupDuration: 1.0, invincibilityDuration: 1.0, invincibilitySpeedMult: 1.0, armor: 0.0, dashDamageMult: 0, dashParticle: '#f39c12', canShoot: true }
+            modifiers: { hp: 1.0, damage: 1.0, speed: 1.0, regen: 1.0, lifesteal: 1.0, projCount: 1.0, atkRange: 1.0, atkCooldown: 1.0, maxEnergy: 1.0, energyIdle: 1.0, energyWalk: 1.0, dashCost: 1.0, dashSpeed: 1.0, dashDuration: 1.0, chargeupDuration: 1.0, invincibilityDuration: 1.0, invincibilitySpeedMult: 1.0, armor: 0.0, dashDamageMult: 0, dashParticle: '#f39c12', canShoot: true }
         },
         char_2: {
             id: 2,
             name: 'BULWARK-02',
             sprite: 'assets/char_2.svg',
             base: {
-                SIZE: 36,
+                SIZE: 42,
                 LERP: 0.1,
-                SPEED: 3.2,
+                SPEED: 10,
                 MAX_HP: 140,
                 REGEN: 0.012,
                 DAMAGE: 15,
@@ -420,17 +443,15 @@ export const CONFIG = {
                 DASH_COST: 24,
                 DASH_SPEED: 30,
                 DASH_DURATION: 180,
-                ABILITY_COST: 100,
                 CHARGEUP_DURATION: 10000,
-                ABILITY_2_COST: 160,
                 INVINCIBILITY_DURATION: 6000,
                 INVINCIBILITY_SPEED_MULT: 2.5
             },
-            modifiers: { hp: 1.8, damage: 1.5, speed: 0.8, regen: 1.2, lifesteal: 1.0, projCount: 0.0, atkRange: 0.8, atkCooldown: 1.1, maxEnergy: 1.2, energyIdle: 1.8, energyWalk: 1.8, dashCost: 0.8, dashSpeed: 1.5, dashDuration: 1.2, abilityCost: 1.0, ability2Cost: 1.0, chargeupDuration: 1.0, invincibilityDuration: 1.0, invincibilitySpeedMult: 1.2, armor: 0.2, dashDamageMult: 10, dashParticle: '#e74c3c', canShoot: false }
+            modifiers: { hp: 1.8, damage: 1.5, speed: 0.8, regen: 1.2, lifesteal: 1.0, projCount: 0.0, atkRange: 0.8, atkCooldown: 1.1, maxEnergy: 1.2, energyIdle: 1.8, energyWalk: 1.8, dashCost: 0.8, dashSpeed: 1.5, dashDuration: 1.2, chargeupDuration: 1.0, invincibilityDuration: 1.0, invincibilitySpeedMult: 1.2, armor: 0.2, dashDamageMult: 10, dashParticle: '#e74c3c', canShoot: false }
         }
     },
     // Legacy aliases kept so older modules can keep reading while refactor is in progress.
-    TILE_SIZE: 64,
-    PARTICLES: { MOBILE_MULT: 0.5, PC_MULT: 1.0 },
-    CAMERA: { ZOOM_MOBILE: 0.7, ZOOM_PC: 1.0 }
+    TILE_SIZE: 32,
+    PARTICLES: { MOBILE_MULT: 0.5, PC_MULT: 0.7 },
+    CAMERA: { ZOOM_MOBILE: 0.6, ZOOM_PC: 1.0 }
 };

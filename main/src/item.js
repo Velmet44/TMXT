@@ -34,11 +34,11 @@ export class Item {
 
         // Magnet Pull (Attracts everything EXCEPT other magnets)
         if (isMagnetActive && this.type.id !== 'magnet') {
-            // Move towards player
             const dist = Math.sqrt(distSq);
             const speed = CONFIG.ITEMS.RUNTIME.MAGNET_PULL_SPEED;
-            this.vx = (dx / dist) * speed;
-            this.vy = (dy / dist) * speed;
+            const safeDist = Math.max(CONFIG.ITEMS.RUNTIME.MIN_PULL_DIST, dist);
+            this.vx = (dx / safeDist) * speed;
+            this.vy = (dy / safeDist) * speed;
             this.x += this.vx;
             this.y += this.vy;
         }
@@ -51,19 +51,8 @@ export class Item {
         const screenX = this.x - camera.x;
         const screenY = this.y - camera.y;
 
-        // Don't draw if off-screen (accounting for zoom)
-        const zoom = ctx.canvas.width / (ctx.canvas.getBoundingClientRect().width || ctx.canvas.width);
-        // Better: just check against the scaled canvas bounds
-        // Since we already scaled the context, we check against the unscaled bounds divided by zoom
-        // But the Engine class doesn't pass zoom here easily. 
-        // Let's use a simpler safe check or just remove the check if it's causing issues.
-        // Given the scale is applied, drawing coordinates are in world space.
-        
         const canvasW = ctx.canvas.width;
         const canvasH = ctx.canvas.height;
-        // If zoom is 0.5, we see more of the world.
-        // We can just use large enough bounds to be safe, or pass zoom.
-        // Let's assume a reasonable zoom range.
         const margin = CONFIG.ITEMS.RUNTIME.OFFSCREEN_MARGIN;
         if (screenX < -margin || screenX > canvasW + margin || 
             screenY < -margin || screenY > canvasH + margin) return;

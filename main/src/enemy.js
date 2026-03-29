@@ -40,6 +40,9 @@ export class Enemy {
         this.fuseTimer = 0;
         this.dropsSpawned = false;
         this.scalePop = 0;
+        this.timeSlowMult = 1;
+        this.vulnerableUntil = 0;
+        this.vulnerableMult = 1;
     }
 
     updateStats() {
@@ -101,14 +104,15 @@ export class Enemy {
         }
 
         const dist = Math.sqrt(distSq);
+        const safeDist = Math.max(CONFIG.ENEMY.RUNTIME.MIN_MOVE_DIST, dist);
         this.facing = dx > CONFIG.ENEMY.RUNTIME.FACING_THRESHOLD ? 1 : -1;
 
-        if (this.type === 'zombie' || this.type === 'exploder') {
+        if (this.type === 'zombie' || this.type === 'exploder' || this.type === 'leechling') {
             if (dist > CONFIG.ENEMY.RUNTIME.MOVE_STOP_DIST) {
                 // Exploder moves faster but stops when exploding
-                const currentSpeed = (this.type === 'exploder' && this.isExploding) ? 0 : this.speed;
-                this.x += (dx / dist) * currentSpeed;
-                this.y += (dy / dist) * currentSpeed;
+                const currentSpeed = (this.type === 'exploder' && this.isExploding) ? 0 : this.speed * (this.timeSlowMult || 1);
+                this.x += (dx / safeDist) * currentSpeed;
+                this.y += (dy / safeDist) * currentSpeed;
             }
             
             if (this.type === 'exploder') {
@@ -124,12 +128,13 @@ export class Enemy {
             }
         } else if (this.type === 'skeleton') {
             const range = this.range;
+            const speed = this.speed * (this.timeSlowMult || 1);
             if (dist > range) {
-                this.x += (dx / dist) * this.speed;
-                this.y += (dy / dist) * this.speed;
+                this.x += (dx / safeDist) * speed;
+                this.y += (dy / safeDist) * speed;
             } else if (dist < range - CONFIG.ENEMY.RUNTIME.SKELETON_RETREAT_GAP) {
-                this.x -= (dx / dist) * this.speed;
-                this.y -= (dy / dist) * this.speed;
+                this.x -= (dx / safeDist) * speed;
+                this.y -= (dy / safeDist) * speed;
             }
 
             const now = Date.now();
@@ -169,7 +174,11 @@ export class Enemy {
 
     takeDamage(amount) {
         if (this.type === 'exploder' && this.isExploding) return; // Invincible once fuse starts
-        this.hp -= amount;
+        let finalDamage = amount;
+        if (this.vulnerableUntil && Date.now() < this.vulnerableUntil) {
+            finalDamage *= this.vulnerableMult || 1;
+        }
+        this.hp -= finalDamage;
         this.isHit = true;
         this.hitTimer = 0;
         // Visual 'pop' when hit
@@ -200,7 +209,11 @@ export class Enemy {
             ctx.globalAlpha = Math.max(CONFIG.ENEMY.VISUAL.STUN_ALPHA_MIN, ctx.globalAlpha * CONFIG.ENEMY.VISUAL.STUN_ALPHA_MULT);
         }
 
-        let mainColor = this.type === 'zombie' ? CONFIG.COLORS.ZOMBIE : (this.type === 'skeleton' ? CONFIG.COLORS.SKELETON : CONFIG.COLORS.LADYBUG);
+        let mainColor = this.type === 'zombie'
+            ? CONFIG.COLORS.ZOMBIE
+            : (this.type === 'skeleton'
+                ? CONFIG.COLORS.SKELETON
+                : (this.type === 'leechling' ? CONFIG.COLORS.LEECHLING : CONFIG.COLORS.LADYBUG));
         let scale = (1 + (this.level - 1) * CONFIG.ENEMY.VISUAL.LEVEL_SCALE_PER_LEVEL) * (1 + this.scalePop);
         
         // Exploder flashing
@@ -257,9 +270,24 @@ export class Enemy {
             ctx.arc(CONFIG.ENEMY.VISUAL.EXPLODER.SPOT_A, CONFIG.ENEMY.VISUAL.EXPLODER.SPOT_B, CONFIG.ENEMY.VISUAL.EXPLODER.SPOT_R, 0, Math.PI * 2);
             ctx.arc(CONFIG.ENEMY.VISUAL.EXPLODER.SPOT_C, 0, CONFIG.ENEMY.VISUAL.EXPLODER.SPOT_R, 0, Math.PI * 2);
             ctx.fill();
+        } else if (this.type === 'leechling') {
+            const v = CONFIG.ENEMY.VISUAL.LEECHLING;
+            ctx.fillStyle = this.isHit ? '#fff' : mainColor;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, this.size * v.BODY_R_X, this.size * v.BODY_R_Y, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#2c3e50';
+            ctx.beginPath();
+            ctx.arc(this.size * 0.1, -this.size * 0.1, this.size * v.CORE_R, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(this.size * 0.15, this.size * v.FANG_Y, this.size * v.FANG_W, this.size * v.FANG_H);
+            ctx.fillRect(this.size * -0.05, this.size * v.FANG_Y, this.size * v.FANG_W, this.size * v.FANG_H);
         }
 
-        if (this.type !== 'exploder') {
+        if (this.type !== 'exploder' && this.type !== 'leechling') {
             ctx.fillStyle = '#000';
             ctx.fillRect(CONFIG.ENEMY.VISUAL.EYES.R_X, CONFIG.ENEMY.VISUAL.EYES.Y + limp, CONFIG.ENEMY.VISUAL.EYES.SIZE, CONFIG.ENEMY.VISUAL.EYES.SIZE);
             ctx.fillRect(CONFIG.ENEMY.VISUAL.EYES.L_X, CONFIG.ENEMY.VISUAL.EYES.Y + limp, CONFIG.ENEMY.VISUAL.EYES.SIZE, CONFIG.ENEMY.VISUAL.EYES.SIZE);

@@ -9,9 +9,14 @@ export class Bullet {
         this.speed = isEnemy ? CONFIG.ENEMY.SKELETON.PROJ_SPEED : CONFIG.BULLET.SPEED;
         this.damage = isEnemy ? CONFIG.ENEMY.SKELETON.DAMAGE : CONFIG.BULLET.DAMAGE;
         
-        const dx = targetX - x;
-        const dy = targetY - y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+        let dx = targetX - x;
+        let dy = targetY - y;
+        let dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < CONFIG.BULLET.RUNTIME.MIN_AIM_DIST) {
+            dx = 1;
+            dy = 0;
+            dist = 1;
+        }
         
         // Juice: Random variation in speed and spread
         const speedVar = isEnemy ? 1 : CONFIG.BULLET.PLAYER_SPEED_VAR_MIN + Math.random() * CONFIG.BULLET.PLAYER_SPEED_VAR_RANGE;
@@ -26,13 +31,15 @@ export class Bullet {
         this.angle = Math.atan2(dy, dx);
         this.frame = Math.random() * CONFIG.XP_ORB.RUNTIME.SHINE_INIT_MAX;
         this.trail = [];
+        this.timeScale = 1;
     }
 
     update() {
         this.trail.push({ x: this.x, y: this.y });
         if (this.trail.length > CONFIG.BULLET.TRAIL_LENGTH) this.trail.shift();
-        this.x += this.vx;
-        this.y += this.vy;
+        const mult = this.timeScale || 1;
+        this.x += this.vx * mult;
+        this.y += this.vy * mult;
         this.frame += CONFIG.BULLET.FRAME_STEP;
     }
 
