@@ -97,15 +97,16 @@ export const updateDropSystemCore = (engine) => {
                 return true;
             });
             const totalChance = candidateTypes.reduce((sum, type) => sum + (type.chance || 0), 0);
-            if (totalChance <= 0) continue;
-            let roll = Math.random() * totalChance;
             let selectedType = null;
-            for (const type of candidateTypes) {
-                if (roll < type.chance) {
-                    selectedType = type;
-                    break;
+            if (totalChance > 0) {
+                let roll = Math.random() * totalChance;
+                for (const type of candidateTypes) {
+                    if (roll < type.chance) {
+                        selectedType = type;
+                        break;
+                    }
+                    roll -= type.chance;
                 }
-                roll -= type.chance;
             }
             if (selectedType && !visibleTypes.has(selectedType.id)) {
                 engine.items.push(new Item(e.x, e.y, selectedType));
