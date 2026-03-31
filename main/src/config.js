@@ -32,6 +32,19 @@ const bulwarkUpgrades = [
     { id: 'bw_dash_range', name: 'Breach Vector', desc: '+35% Dash Attack Range', rarity: 'rare', icon: '\uD83D\uDCE1', apply: (p) => { p.dashRangeMult = (p.dashRangeMult || 1) + 0.35; } }
 ];
 
+const necromancerUpgrades = [
+    { id: 'nc_hp', name: 'Bone Ward', desc: '+22 Max HP', rarity: 'common', icon: '\u2620', apply: (p) => { p.maxHp += 22; p.hp += 22; } },
+    { id: 'nc_regen', name: 'Soul Stitch', desc: '+0.05 HP/sec Regen', rarity: 'common', icon: '\u2697', apply: (p) => { p.regen += 0.05; } },
+    { id: 'nc_energy', name: 'Hex Battery', desc: '+55 Max Energy', rarity: 'uncommon', icon: '\uD83D\uDD0B', apply: (p) => { p.maxEnergy += 55; p.energy += 55; } },
+    { id: 'nc_energy_regen', name: 'Dark Focus', desc: '+55% Energy Regen', rarity: 'uncommon', icon: '\uD83C\uDF19', apply: (p) => { p.energyRegenMult += 0.55; } },
+    { id: 'nc_damage', name: 'Witchfire Amp', desc: '+6 Attack Damage', rarity: 'uncommon', icon: '\uD83D\uDD25', apply: (p) => { p.damage += 6; } },
+    { id: 'nc_range', name: 'Eldritch Reach', desc: '+25% Attack Range', rarity: 'rare', icon: '\u2728', apply: (p) => { p.atkRange *= 1.25; } },
+    { id: 'nc_atk_speed', name: 'Ritual Haste', desc: '-14% Attack Cooldown', rarity: 'rare', icon: '\u26A1', apply: (p) => { p.atkCooldown *= 0.86; } },
+    { id: 'nc_pierce', name: 'Spectral Thread', desc: '+1 Projectile Pierce', rarity: 'rare', icon: '\uD83E\uDEA1', apply: (p) => { p.extraPierce = (p.extraPierce || 0) + 1; } },
+    { id: 'nc_lifesteal', name: 'Soul Leech', desc: '+6% Lifesteal', rarity: 'rare', icon: '\uD83D\uDD2E', apply: (p) => { p.lifesteal += 0.06; } },
+    { id: 'nc_splash', name: 'Blight Nova', desc: '+20 Fireball Splash Radius', rarity: 'legendary', icon: '\uD83C\uDF11', apply: (p) => { p.extraSplashRadius = (p.extraSplashRadius || 0) + 20; } }
+];
+
 export const CONFIG = {
     // Global world/camera tuning.
     WORLD: {
@@ -101,7 +114,7 @@ export const CONFIG = {
         SYNTH_RAMP_TIME: 0.25,
         SYNTH_STOP_TIME: 0.3,
         SFX_DEFAULT_PITCH_VAR: 0.1,
-        SYNTH_TONES: { crit: 880, magnet: 660, leech: 520, nuke: 120, default: 500 }
+        SYNTH_TONES: { crit: 880, magnet: 660, leech: 520, necro: 420, nuke: 120, default: 500 }
     },
     // Bullet travel and rendering values.
     BULLET: {
@@ -293,6 +306,20 @@ export const CONFIG = {
             PULL_CURVE_POWER: 1.35,
             SCREEN_FLASH_WHILE_ACTIVE: 0.07
         },
+        NECROMANCER: {
+            GRAVE_STEP_SHAKE: 10,
+            GRAVE_TRAIL_TICK_MS: 220,
+            METEOR_COUNT_DEFAULT: 5,
+            METEOR_IMPACT_DELAY_MS: 550,
+            METEOR_STAGGER_MS: 180,
+            METEOR_RADIUS: 90,
+            METEOR_PARTICLES: 18,
+            VORTEX_CORE_RADIUS_MULT: 0.2,
+            VORTEX_TICK_MS: 180,
+            VORTEX_DRAIN_MULT: 0.12,
+            VORTEX_PARTICLES: 10,
+            LICH_AURA_FLASH: 0.09
+        },
         DASH_HIT: { PARTICLES: 6, SHAKE: 12, SFX_VOL: 0.1 },
         NukeActivation: { DEFAULT_MIN_LEVEL: 3 },
         NUKE: { DEFAULT_DAMAGE: 9999, DEFAULT_SHAKE: 50, DEFAULT_FLASH: 1.0, DEFAULT_MAX_CHARGES: 3, SFX_VOL: 0.05, ENEMY_SLASHES: 3 },
@@ -354,6 +381,7 @@ export const CONFIG = {
         SKELETON: '#ecf0f1',
         LADYBUG: '#e74c3c',
         LEECHLING: '#7bed9f',
+        NECRO: '#6c5ce7',
         XP: '#3498db',
         ENERGY: '#9b59b6',
         BULLET: '#f39c12',
@@ -366,7 +394,8 @@ export const CONFIG = {
     // Upgrade pools; character profiles reference these by key.
     UPGRADES: {
         SHARED: sharedUpgrades,
-        BULWARK: bulwarkUpgrades
+        BULWARK: bulwarkUpgrades,
+        NECROMANCER: necromancerUpgrades
     },
     // Character-specific level scaling + ability definitions.
     CHARACTER_PROFILES: {
@@ -390,6 +419,17 @@ export const CONFIG = {
                 ABILITY_2: { NAME: 'BLACKHOLE CORE', ICON: '\uD83D\uDEE1', COLOR: '#1f2430', MIN_LEVEL: 3, DURATION: 2800, EFFECT: 'gravity_well', RADIUS: 220, PULL: 2.1, DAMAGE: 99999, TARGET_VISIBLE: false },
                 ABILITY_3: { NAME: 'SHOCKWAVE SLAM', ICON: '\uD83D\uDCA5', COLOR: '#e67e22', MIN_LEVEL: 3, EFFECT: 'shockwave', DAMAGE: 360, RADIUS: 320, KNOCKBACK: 140, VULNERABLE_MULT: 1.35, VULNERABLE_MS: 5000, STUN_MS: 400 },
                 ABILITY_4: { NAME: 'CITADEL MODE', ICON: '\uD83E\uDDF1', COLOR: '#95a5a6', MIN_LEVEL: 3, EFFECT: 'citadel', DURATION: 7000, RANGE_MULT: 2.4, ATTACK_BONUS: 3, ATK_COOLDOWN_MULT: 0.75 }
+            }
+        },
+        char_3: {
+            id: 3,
+            upgradeSet: 'NECROMANCER',
+            leveling: { HP_PER_LEVEL: 4, DMG_PER_LEVEL: 1.4, SPD_PER_LEVEL: 0.05, ATK_COOLDOWN_MULT: 0.985, PROJ_INTERVAL: 2, PROJ_PER_INTERVAL: 1, XP_GROWTH_MULT: 2.0, XP_GROWTH_BASE: 0, ENERGY_PER_LEVEL: 7 },
+            abilities: {
+                ABILITY_1: { NAME: 'GRAVE STEP', ICON: '\uD83D\uDD2E', COLOR: '#6c5ce7', MIN_LEVEL: 3, EFFECT: 'grave_step', DISTANCE: 220, TRAIL_DURATION: 1800, TRAIL_RADIUS: 52, TRAIL_DAMAGE: 60 },
+                ABILITY_2: { NAME: 'SOUL VORTEX', ICON: '\uD83C\uDF19', COLOR: '#2d1b69', MIN_LEVEL: 3, EFFECT: 'soul_vortex', DURATION: 3200, RADIUS: 230, PULL: 1.9, DAMAGE: 99999 },
+                ABILITY_3: { NAME: 'METEOR RAIN', ICON: '\u2604', COLOR: '#e67e22', MIN_LEVEL: 3, EFFECT: 'meteor_rain', METEOR_COUNT: 5, DAMAGE: 360, RADIUS: 90, IMPACT_DELAY: 550, STAGGER: 180 },
+                ABILITY_4: { NAME: 'LICH ASCENDANCE', ICON: '\u2620', COLOR: '#8e44ad', MIN_LEVEL: 3, EFFECT: 'lich_form', DURATION: 7000, DAMAGE_MULT: 1.4, PIERCE: 2, LIFESTEAL_BONUS: 0.12, SPLASH_RADIUS: 70 }
             }
         }
     },
@@ -448,6 +488,33 @@ export const CONFIG = {
                 INVINCIBILITY_SPEED_MULT: 2.5
             },
             modifiers: { hp: 1.8, damage: 1.5, speed: 0.8, regen: 1.2, lifesteal: 1.0, projCount: 0.0, atkRange: 0.8, atkCooldown: 1.1, maxEnergy: 1.2, energyIdle: 1.8, energyWalk: 1.8, dashCost: 0.8, dashSpeed: 1.5, dashDuration: 1.2, chargeupDuration: 1.0, invincibilityDuration: 1.0, invincibilitySpeedMult: 1.2, armor: 0.2, dashDamageMult: 10, dashParticle: '#e74c3c', canShoot: false }
+        },
+        char_3: {
+            id: 3,
+            name: 'Necromancer-03',
+            sprite: 'assets/char_3.svg',
+            base: {
+                SIZE: 42,
+                LERP: 0.1,
+                SPEED: 4.6,
+                MAX_HP: 95,
+                REGEN: 0.011,
+                DAMAGE: 12,
+                LIFESTEAL: 0.02,
+                ATTACK_RANGE: 430,
+                ATTACK_COOLDOWN: 360,
+                PROJ_COUNT: 1,
+                MAX_ENERGY: 130,
+                ENERGY_REGEN_IDLE: 0.16,
+                ENERGY_REGEN_WALK: 0.08,
+                DASH_COST: 22,
+                DASH_SPEED: 28,
+                DASH_DURATION: 160,
+                CHARGEUP_DURATION: 9000,
+                INVINCIBILITY_DURATION: 5000,
+                INVINCIBILITY_SPEED_MULT: 2.0
+            },
+            modifiers: { hp: 1.0, damage: 1.0, speed: 1.0, regen: 1.0, lifesteal: 1.0, projCount: 1.0, atkRange: 1.0, atkCooldown: 1.0, maxEnergy: 1.0, energyIdle: 1.0, energyWalk: 1.0, dashCost: 0.9, dashSpeed: 1.1, dashDuration: 1.0, chargeupDuration: 1.0, invincibilityDuration: 1.0, invincibilitySpeedMult: 1.0, armor: 0.0, dashDamageMult: 0, dashParticle: '#6c5ce7', canShoot: true }
         }
     },
     // Legacy aliases kept so older modules can keep reading while refactor is in progress.

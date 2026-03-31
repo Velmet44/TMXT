@@ -244,6 +244,64 @@ export class BaseEngine {
             this.activateNuke(this.player.pendingNuke);
             this.player.pendingNuke = null;
         }
+        if (this.player.pendingMeteorRain) {
+            this.queueMeteorRain(this.player.pendingMeteorRain);
+            this.player.pendingMeteorRain = null;
+        }
+        this.processMeteorRain();
+
+        if (this.player.graveTrailActive) {
+            const trail = this.player.graveTrailActive;
+            const now = Date.now();
+            if (now - (trail.lastTick || 0) >= CONFIG.ENGINE.NECROMANCER.GRAVE_TRAIL_TICK_MS) {
+                this.enemies.forEach((e) => {
+                    if (e.isDead) return;
+                    const dx = e.x - trail.x;
+                    const dy = e.y - trail.y;
+                    if (dx * dx + dy * dy > trail.radius * trail.radius) return;
+                    e.takeDamage(trail.damage);
+                    this.damageNumbers.push(new DamageNumber(e.x, e.y, Math.round(trail.damage), false));
+                    this.spawnHitParticles(e.x, e.y, CONFIG.COLORS.NECRO, 5);
+                });
+                trail.lastTick = now;
+            }
+        }
+
+        if (this.player.soulVortexActive) {
+            const vortex = this.player.soulVortexActive;
+            const now = Date.now();
+            const radiusSq = vortex.radius * vortex.radius;
+            const coreRadius = Math.max(10, vortex.radius * CONFIG.ENGINE.NECROMANCER.VORTEX_CORE_RADIUS_MULT);
+            this.gravityFlash = Math.max(this.gravityFlash, CONFIG.ENGINE.NECROMANCER.LICH_AURA_FLASH);
+            this.enemies.forEach((e) => {
+                if (e.isDead) return;
+                const dx = vortex.center.x - e.x;
+                const dy = vortex.center.y - e.y;
+                const distSq = dx * dx + dy * dy;
+                if (distSq > radiusSq) return;
+                const dist = Math.sqrt(Math.max(CONFIG.ENGINE.GRAVITY_WELL.DIST_MIN, distSq));
+                const norm = Math.max(0, 1 - dist / vortex.radius);
+                const pull = vortex.pull * (1 + norm * 3.2);
+                e.x += (dx / dist) * pull;
+                e.y += (dy / dist) * pull;
+                e.stunUntil = Math.max(e.stunUntil || 0, now + CONFIG.ENGINE.GRAVITY_WELL.SOFT_STUN_MS);
+                if (dist <= coreRadius) {
+                    e.takeDamage(vortex.damage || CONFIG.ENGINE.NUKE.DEFAULT_DAMAGE);
+                    this.damageNumbers.push(new DamageNumber(e.x, e.y, 'SOUL', true));
+                    this.spawnHitParticles(e.x, e.y, '#1f2430', CONFIG.ENGINE.NECROMANCER.VORTEX_PARTICLES);
+                    this.spawnHitParticles(e.x, e.y, CONFIG.COLORS.NECRO, CONFIG.ENGINE.NECROMANCER.VORTEX_PARTICLES);
+                } else if (now - (vortex.lastTick || 0) >= CONFIG.ENGINE.NECROMANCER.VORTEX_TICK_MS) {
+                    const drainDmg = Math.max(1, this.player.getCurrentDamage() * CONFIG.ENGINE.NECROMANCER.VORTEX_DRAIN_MULT);
+                    e.takeDamage(drainDmg);
+                    this.damageNumbers.push(new DamageNumber(e.x, e.y, Math.round(drainDmg), false));
+                    this.spawnHitParticles(e.x, e.y, '#8e44ad', 3);
+                    this.player.hp = Math.min(this.player.maxHp, this.player.hp + drainDmg * 0.05);
+                }
+            });
+            if (now - (vortex.lastTick || 0) >= CONFIG.ENGINE.NECROMANCER.VORTEX_TICK_MS) {
+                vortex.lastTick = now;
+            }
+        }
 
         // Gravity Well (Bulwark ability 2)
         if (this.player.gravityWellActive) {
@@ -417,7 +475,7 @@ export class BaseEngine {
                         const bdx = bullet.x - enemy.x;
                         const bdy = bullet.y - enemy.y;
                         if (bdx * bdx + bdy * bdy < (enemy.size / 2 + bullet.size) ** 2) {
-                            let damage = this.player.getCurrentDamage();
+                            let damage = bullet.damageOverride ?? this.player.getCurrentDamage();
                             const isCrit = this.player.critChance && Math.random() < this.player.critChance;
                             if (isCrit) damage *= CONFIG.ENGINE.CRIT.DAMAGE_MULT;
                             if (isCrit) {
@@ -432,9 +490,17 @@ export class BaseEngine {
                             enemy.takeDamage(damage);
                             this.damageNumbers.push(new DamageNumber(enemy.x, enemy.y, damage, isCrit));
                             this.spawnHitParticles(bullet.x, bullet.y, isCrit ? '#f1c40f' : '#fff');
-                            bullet.active = false;
-                            if (this.player.lifesteal) {
-                                this.player.hp = Math.min(this.player.maxHp, this.player.hp + damage * this.player.lifesteal);
+                            if (bullet.splashRadius && bullet.splashRadius > 0) {
+                                this.applyBulletSplash(enemy, bullet.splashRadius, damage * 0.45);
+                            }
+                            if ((bullet.pierceRemaining || 0) > 0) {
+                                bullet.pierceRemaining--;
+                            } else {
+                                bullet.active = false;
+                            }
+                            const lifesteal = this.player.getCurrentLifesteal ? this.player.getCurrentLifesteal() : (this.player.lifesteal || 0);
+                            if (lifesteal > 0) {
+                                this.player.hp = Math.min(this.player.maxHp, this.player.hp + damage * lifesteal);
                             }
                         }
                     }
@@ -464,6 +530,9 @@ export class BaseEngine {
                             const b = new Bullet(this.player.x, this.player.y, t.enemy.x, t.enemy.y);
                             if (this.player.bulletSizeMult) b.size *= this.player.bulletSizeMult;
                             if (zeroFrame) b.timeScale = zeroFrame.playerProjSpeedMult;
+                            b.damageOverride = this.player.getCurrentDamage();
+                            b.pierceRemaining = Math.max(0, (this.player.extraPierce || 0) + (this.player.lichAscendanceActive?.pierce || 0));
+                            b.splashRadius = (this.player.extraSplashRadius || 0) + (this.player.lichAscendanceActive?.splashRadius || 0);
                             this.bullets.push(b);
                         });
                     }, i * CONFIG.ENGINE.NORMAL_SHOT.MULTI_DELAY_MS);
@@ -509,6 +578,61 @@ export class BaseEngine {
     spawnHitParticles(x, y, color, count = CONFIG.ENGINE.PARTICLE_SPAWN_DEFAULT) {
         const finalCount = Math.max(1, Math.ceil(count * this.particleMult));
         for(let i=0; i<finalCount; i++) this.particles.push(new Particle(x, y, color));
+    }
+
+    applyBulletSplash(centerEnemy, radius, damage) {
+        const radiusSq = radius * radius;
+        this.enemies.forEach((e) => {
+            if (e.isDead || e === centerEnemy) return;
+            const dx = e.x - centerEnemy.x;
+            const dy = e.y - centerEnemy.y;
+            if (dx * dx + dy * dy > radiusSq) return;
+            e.takeDamage(damage);
+            this.damageNumbers.push(new DamageNumber(e.x, e.y, Math.round(damage), false));
+            this.spawnHitParticles(e.x, e.y, '#ff9f43', 4);
+        });
+    }
+
+    queueMeteorRain(cfg) {
+        const now = Date.now();
+        const aliveEnemies = this.enemies.filter((e) => !e.isDead);
+        if (!aliveEnemies.length) return;
+        this.player.meteorStrikes = [];
+        for (let i = 0; i < cfg.count; i++) {
+            const target = aliveEnemies[Math.floor(Math.random() * aliveEnemies.length)];
+            const spread = cfg.radius * 0.6;
+            const tx = target.x + (Math.random() - 0.5) * spread;
+            const ty = target.y + (Math.random() - 0.5) * spread;
+            this.player.meteorStrikes.push({
+                x: tx,
+                y: ty,
+                radius: cfg.radius,
+                damage: cfg.damage,
+                impactAt: now + cfg.impactDelay + (i * cfg.stagger),
+                impacted: false
+            });
+        }
+    }
+
+    processMeteorRain() {
+        if (!this.player.meteorStrikes?.length) return;
+        const now = Date.now();
+        this.player.meteorStrikes.forEach((strike) => {
+            if (strike.impacted || now < strike.impactAt) return;
+            strike.impacted = true;
+            this.spawnHitParticles(strike.x, strike.y, '#e67e22', CONFIG.ENGINE.NECROMANCER.METEOR_PARTICLES);
+            this.spawnHitParticles(strike.x, strike.y, '#f1c40f', CONFIG.ENGINE.NECROMANCER.METEOR_PARTICLES);
+            this.enemies.forEach((e) => {
+                if (e.isDead) return;
+                const dx = e.x - strike.x;
+                const dy = e.y - strike.y;
+                if (dx * dx + dy * dy > strike.radius * strike.radius) return;
+                e.takeDamage(strike.damage);
+                this.damageNumbers.push(new DamageNumber(e.x, e.y, Math.round(strike.damage), true));
+            });
+            soundManager.playSFX('nuke', 0.03);
+        });
+        this.player.meteorStrikes = this.player.meteorStrikes.filter((strike) => !strike.impacted || (now - strike.impactAt) < 200);
     }
 
     triggerLevelUp() {
@@ -633,6 +757,53 @@ export class BaseEngine {
             this.ctx.stroke();
             this.ctx.restore();
         }
+        if (this.player.graveTrailActive) {
+            const gt = this.player.graveTrailActive;
+            const gx = gt.x - this.camera.x;
+            const gy = gt.y - this.camera.y;
+            this.ctx.save();
+            this.ctx.globalAlpha = 0.2;
+            this.ctx.fillStyle = CONFIG.COLORS.NECRO;
+            this.ctx.beginPath();
+            this.ctx.arc(gx, gy, gt.radius, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.restore();
+        }
+        if (this.player.soulVortexActive) {
+            const sv = this.player.soulVortexActive;
+            const vx = sv.center.x - this.camera.x;
+            const vy = sv.center.y - this.camera.y;
+            const coreR = Math.max(8, sv.radius * CONFIG.ENGINE.NECROMANCER.VORTEX_CORE_RADIUS_MULT);
+            this.ctx.save();
+            this.ctx.globalAlpha = 0.2;
+            this.ctx.fillStyle = '#2d1b69';
+            this.ctx.beginPath();
+            this.ctx.arc(vx, vy, sv.radius, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.globalAlpha = 0.9;
+            this.ctx.fillStyle = '#09060f';
+            this.ctx.beginPath();
+            this.ctx.arc(vx, vy, coreR, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.restore();
+        }
+        if (this.player.meteorStrikes?.length) {
+            const now = Date.now();
+            this.player.meteorStrikes.forEach((strike) => {
+                if (strike.impacted) return;
+                const sx = strike.x - this.camera.x;
+                const sy = strike.y - this.camera.y;
+                const t = Math.max(0, (strike.impactAt - now) / Math.max(1, CONFIG.ENGINE.NECROMANCER.METEOR_IMPACT_DELAY_MS));
+                this.ctx.save();
+                this.ctx.strokeStyle = '#e67e22';
+                this.ctx.globalAlpha = 0.35 + (1 - t) * 0.45;
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                this.ctx.arc(sx, sy, strike.radius, 0, Math.PI * 2);
+                this.ctx.stroke();
+                this.ctx.restore();
+            });
+        }
         if (this.player.gravityWellActive) {
             const gw = this.player.gravityWellActive;
             const gx = gw.center.x - this.camera.x;
@@ -659,6 +830,18 @@ export class BaseEngine {
             this.ctx.restore();
         }
         this.player.draw(this.ctx, this.camera);
+        if (this.player.lichAscendanceActive) {
+            const sx = this.player.x - this.camera.x;
+            const sy = this.player.y - this.camera.y;
+            this.ctx.save();
+            this.ctx.globalAlpha = 0.25;
+            this.ctx.strokeStyle = '#8e44ad';
+            this.ctx.lineWidth = 4;
+            this.ctx.beginPath();
+            this.ctx.arc(sx, sy, this.player.size * 0.9, 0, Math.PI * 2);
+            this.ctx.stroke();
+            this.ctx.restore();
+        }
         if (this.critPulse > 0) {
             const sx = this.player.x - this.camera.x;
             const sy = this.player.y - this.camera.y;

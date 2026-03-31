@@ -80,6 +80,13 @@ export class BaseCharacter {
         this.pendingShockwave = null;
         this.zeroFrameActive = null;
         this.citadelModeActive = null;
+        this.graveTrailActive = null;
+        this.soulVortexActive = null;
+        this.pendingMeteorRain = null;
+        this.meteorStrikes = [];
+        this.lichAscendanceActive = null;
+        this.extraPierce = 0;
+        this.extraSplashRadius = 0;
 
         // Runtime state
         this.isDead = false;
@@ -188,7 +195,12 @@ export class BaseCharacter {
         let dmg = this.damage;
         if (this.isChargedUp) dmg *= CONFIG.PLAYER_RUNTIME.DAMAGE_MULT_CHARGE;
         if (this.isInvincible) dmg *= CONFIG.PLAYER_RUNTIME.DAMAGE_MULT_INVINCIBLE;
+        if (this.lichAscendanceActive) dmg *= this.lichAscendanceActive.damageMult || 1;
         return dmg;
+    }
+
+    getCurrentLifesteal() {
+        return (this.lifesteal || 0) + (this.lichAscendanceActive?.lifestealBonus || 0);
     }
 
     getAbilityConfig(slot) {
@@ -334,9 +346,12 @@ export class BaseCharacter {
 
         if (this.isChargedUp && now > this.chargeUpEndTime) this.isChargedUp = false;
         if (this.isInvincible && now > this.invincibilityEndTime) this.isInvincible = false;
-        if (this.gravityWellActive && now > this.gravityWellActive.endTime && this.gravityWellActive.exploded) this.gravityWellActive = null;
+        if (this.gravityWellActive && now > this.gravityWellActive.endTime) this.gravityWellActive = null;
         if (this.zeroFrameActive && now > this.zeroFrameActive.endTime) this.zeroFrameActive = null;
         if (this.citadelModeActive && now > this.citadelModeActive.endTime) this.citadelModeActive = null;
+        if (this.graveTrailActive && now > this.graveTrailActive.endTime) this.graveTrailActive = null;
+        if (this.soulVortexActive && now > this.soulVortexActive.endTime) this.soulVortexActive = null;
+        if (this.lichAscendanceActive && now > this.lichAscendanceActive.endTime) this.lichAscendanceActive = null;
 
         if (now - this.lastRegen > CONFIG.PLAYER_RUNTIME.REGEN_TICK_MS) {
             this.hp = Math.min(this.maxHp, this.hp + this.regen);
