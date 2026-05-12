@@ -85,6 +85,7 @@ export class BaseCharacter {
         this.pendingMeteorRain = null;
         this.meteorStrikes = [];
         this.lichAscendanceActive = null;
+        this.pendingShadowBlink = null;
         this.extraPierce = 0;
         this.extraSplashRadius = 0;
 
@@ -236,7 +237,7 @@ export class BaseCharacter {
         if (!cfg) return false;
 
         if (this.level < this.getAbilityMinLevel(slot)) {
-            this.setAbilityError('You must be at least level 3 to use an ability');
+            this.setAbilityError(`You must be at least level ${this.getAbilityMinLevel(slot)} to use this ability`);
             return false;
         }
         if (cfg.EFFECT === 'nuke' && this.nukeCharges <= 0) {

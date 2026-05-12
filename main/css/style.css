@@ -613,6 +613,72 @@ body {
     margin-top: 20px;
 }
 
+.menu-secondary-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    color: #e6e6e6;
+    padding: 10px 24px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.menu-secondary-btn:hover {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.35);
+}
+
+.secondary-btn {
+    background: #3a4350;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.45);
+}
+
+.secondary-btn:hover {
+    background: #4a5564;
+}
+
+.tutorial-modal {
+    max-width: 760px;
+    border-color: #9b59b6;
+    text-align: left;
+}
+
+.tutorial-modal h1 {
+    color: #ffffff;
+    font-size: 34px;
+    margin-bottom: 8px;
+}
+
+.tutorial-subtitle {
+    color: #a9b4c2;
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+}
+
+.tutorial-body {
+    min-height: 220px;
+    padding: 14px 16px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(0, 0, 0, 0.25);
+    color: #eef2f7;
+    font-size: 16px;
+    line-height: 1.55;
+    white-space: pre-line;
+}
+
+.tutorial-actions {
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
 .credits {
     margin-top: 80px;
     color: rgba(255,255,255,0.4);

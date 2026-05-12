@@ -46,6 +46,8 @@ export class BaseEngine {
         this.dashHitSet = new Set();
         this.lastDashTrail = 0;
         this.soundManager = soundManager;
+        this.tutorialStorageKey = 'tmxt_tutorial_seen_v1';
+        this.tutorialFlow = null;
         
         soundManager.playBGM(ENGINE_STATE.MENU);
         this.tileSize = keys.isMobile ? CONFIG.WORLD.TILE_SIZE * CONFIG.WORLD.TILE_SIZE_MOBILE_MULT : CONFIG.WORLD.TILE_SIZE;
@@ -64,7 +66,10 @@ export class BaseEngine {
     }
 
     initUI() {
-        const { resumeBtn, bgmSlider, sfxSlider, shareBtn, returnHomeBtn, startBtn } = this.ui;
+        const {
+            resumeBtn, bgmSlider, sfxSlider, shareBtn, returnHomeBtn, startBtn, tutorialBtn,
+            tutorialPrevBtn, tutorialNextBtn, tutorialCloseBtn
+        } = this.ui;
         if (resumeBtn) resumeBtn.onclick = () => this.togglePause();
         if (bgmSlider) bgmSlider.oninput = (e) => soundManager.setVolume('bgm', parseFloat(e.target.value));
         if (sfxSlider) sfxSlider.oninput = (e) => soundManager.setVolume('sfx', parseFloat(e.target.value));
@@ -74,6 +79,96 @@ export class BaseEngine {
         if (startBtn) {
             startBtn.addEventListener('click', () => this.start());
         }
+        if (tutorialBtn) tutorialBtn.addEventListener('click', () => this.openTutorial({ autoStartAfter: false }));
+        if (tutorialPrevBtn) tutorialPrevBtn.addEventListener('click', () => this.moveTutorialStep(-1));
+        if (tutorialNextBtn) tutorialNextBtn.addEventListener('click', () => this.moveTutorialStep(1));
+        if (tutorialCloseBtn) tutorialCloseBtn.addEventListener('click', () => this.closeTutorial(false));
+    }
+
+    hasSeenTutorial() {
+        try {
+            return localStorage.getItem(this.tutorialStorageKey) === '1';
+        } catch (_err) {
+            return false;
+        }
+    }
+
+    markTutorialSeen() {
+        try {
+            localStorage.setItem(this.tutorialStorageKey, '1');
+        } catch (_err) {
+            // Ignore storage failures; tutorial remains functional without persistence.
+        }
+    }
+
+    getCharacterTutorialSteps(characterId) {
+        const charCfg = Object.values(CONFIG.CHARACTERS || {}).find((c) => c.id === characterId) || CONFIG.CHARACTERS.char_1;
+        const profile = Object.values(CONFIG.CHARACTER_PROFILES || {}).find((p) => p.id === characterId) || CONFIG.CHARACTER_PROFILES.char_1;
+        const ability1 = profile?.abilities?.ABILITY_1?.NAME || 'ABILITY 1';
+        const ability2 = profile?.abilities?.ABILITY_2?.NAME || 'ABILITY 2';
+        const ability3 = profile?.abilities?.ABILITY_3?.NAME || 'ABILITY 3';
+        const ability4 = profile?.abilities?.ABILITY_4?.NAME || 'ABILITY 4';
+
+        const controlsStep = keys.isMobile
+            ? `Move with the left joystick.\nDash with DASH.\nAbilities are on Z / X / C / V buttons on the right.\nYour weapon auto-attacks nearby enemies in range.`
+            : `Move with WASD or Arrow Keys.\nDash with SHIFT.\nUse abilities with Z, X, C, V.\nYour weapon auto-attacks nearby enemies in range.`;
+
+        const characterStep = `Selected Operative: ${charCfg?.name || 'UNIT'}\n\nAbility Guide:\nZ: ${ability1}\nX: ${ability2}\nC: ${ability3}\nV: ${ability4}\n\nAbilities unlock at Level 3 and require full energy.`;
+
+        const survivalStep = `Survival Basics:\nPick up XP to level up and choose upgrades.\nCollect drops for health, speed, rapid fire, magnet, or nuke charge.\nPause with ESC anytime.\nRuns end on death, then you can restart from menu.`;
+
+        return [
+            { title: 'Core Controls', body: controlsStep },
+            { title: 'Character Kit', body: characterStep },
+            { title: 'Run Flow', body: survivalStep }
+        ];
+    }
+
+    openTutorial({ autoStartAfter = false } = {}) {
+        const overlay = this.ui.tutorialOverlay;
+        if (!overlay) return;
+        const selectedId = keys.selectedCharIndex || CONFIG.PLAYER_RUNTIME.DEFAULT_CHARACTER_ID;
+        this.tutorialFlow = {
+            index: 0,
+            steps: this.getCharacterTutorialSteps(selectedId),
+            autoStartAfter
+        };
+        this.renderTutorialStep();
+        overlay.classList.remove('hidden');
+    }
+
+    renderTutorialStep() {
+        if (!this.tutorialFlow) return;
+        const { tutorialTitle, tutorialSubtitle, tutorialBody, tutorialPrevBtn, tutorialNextBtn, tutorialCloseBtn } = this.ui;
+        const { index, steps } = this.tutorialFlow;
+        const current = steps[index];
+        if (tutorialTitle) tutorialTitle.innerText = current.title;
+        if (tutorialSubtitle) tutorialSubtitle.innerText = `Step ${index + 1} of ${steps.length}`;
+        if (tutorialBody) tutorialBody.innerText = current.body;
+        if (tutorialPrevBtn) tutorialPrevBtn.disabled = index === 0;
+        if (tutorialNextBtn) tutorialNextBtn.innerText = index >= steps.length - 1 ? 'DONE' : 'NEXT';
+        if (tutorialCloseBtn) tutorialCloseBtn.innerText = this.tutorialFlow.autoStartAfter ? 'SKIP' : 'CLOSE';
+    }
+
+    moveTutorialStep(delta) {
+        if (!this.tutorialFlow) return;
+        const nextIndex = this.tutorialFlow.index + delta;
+        if (nextIndex >= this.tutorialFlow.steps.length) {
+            this.closeTutorial(true);
+            return;
+        }
+        if (nextIndex < 0) return;
+        this.tutorialFlow.index = nextIndex;
+        this.renderTutorialStep();
+    }
+
+    closeTutorial(completed) {
+        const overlay = this.ui.tutorialOverlay;
+        const autoStartAfter = this.tutorialFlow?.autoStartAfter === true;
+        if (overlay) overlay.classList.add('hidden');
+        this.tutorialFlow = null;
+        if (completed || autoStartAfter) this.markTutorialSeen();
+        if (autoStartAfter) this.startRunNow();
     }
 
     startRunNow() {
@@ -97,6 +192,10 @@ export class BaseEngine {
     }
 
     start() {
+        if (!this.hasSeenTutorial()) {
+            this.openTutorial({ autoStartAfter: true });
+            return;
+        }
         this.startRunNow();
     }
 
@@ -244,6 +343,23 @@ export class BaseEngine {
             this.activateNuke(this.player.pendingNuke);
             this.player.pendingNuke = null;
         }
+        if (this.player.pendingShadowBlink) {
+            const sb = this.player.pendingShadowBlink;
+            const radiusSq = sb.radius * sb.radius;
+            this.screenShake = Math.max(this.screenShake, CONFIG.ENGINE.NECROMANCER.SHADOW_BLINK_SHAKE);
+            this.spawnHitParticles(sb.x, sb.y, CONFIG.COLORS.NECRO, CONFIG.ENGINE.NECROMANCER.SHADOW_BLINK_PARTICLES);
+            this.spawnHitParticles(sb.x, sb.y, '#1f2430', CONFIG.ENGINE.NECROMANCER.SHADOW_BLINK_PARTICLES);
+            this.enemies.forEach((e) => {
+                if (e.isDead) return;
+                const dx = e.x - sb.x;
+                const dy = e.y - sb.y;
+                if (dx * dx + dy * dy > radiusSq) return;
+                e.takeDamage(sb.damage);
+                this.damageNumbers.push(new DamageNumber(e.x, e.y, Math.round(sb.damage), true));
+            });
+            soundManager.playSFX('crit', 0.04);
+            this.player.pendingShadowBlink = null;
+        }
         if (this.player.pendingMeteorRain) {
             this.queueMeteorRain(this.player.pendingMeteorRain);
             this.player.pendingMeteorRain = null;
@@ -272,13 +388,20 @@ export class BaseEngine {
             const now = Date.now();
             const radiusSq = vortex.radius * vortex.radius;
             const coreRadius = Math.max(10, vortex.radius * CONFIG.ENGINE.NECROMANCER.VORTEX_CORE_RADIUS_MULT);
+            const viewW = this.canvas.width / this.zoom;
+            const viewH = this.canvas.height / this.zoom;
             this.gravityFlash = Math.max(this.gravityFlash, CONFIG.ENGINE.NECROMANCER.LICH_AURA_FLASH);
             this.enemies.forEach((e) => {
                 if (e.isDead) return;
                 const dx = vortex.center.x - e.x;
                 const dy = vortex.center.y - e.y;
                 const distSq = dx * dx + dy * dy;
-                if (distSq > radiusSq) return;
+                const onScreen = e.x >= this.camera.x
+                    && e.x <= this.camera.x + viewW
+                    && e.y >= this.camera.y
+                    && e.y <= this.camera.y + viewH;
+                if (!vortex.fullScreen && distSq > radiusSq) return;
+                if (vortex.fullScreen && !onScreen) return;
                 const dist = Math.sqrt(Math.max(CONFIG.ENGINE.GRAVITY_WELL.DIST_MIN, distSq));
                 const norm = Math.max(0, 1 - dist / vortex.radius);
                 const pull = vortex.pull * (1 + norm * 3.2);
@@ -522,6 +645,9 @@ export class BaseEngine {
                 const shots = (this.player.multiShotChance && Math.random() < this.player.multiShotChance) ? CONFIG.ENGINE.NORMAL_SHOT.MULTI_SHOT_COUNT : 1;
                 for(let i=0; i<shots; i++) {
                     setTimeout(() => {
+                        if (!this.isStarted || this.isPaused || this.player.isDead || this.gameState !== ENGINE_STATE.RUNNING) return;
+                        targets = targets.filter((t) => !t.enemy.isDead);
+                        if (!targets.length) return;
                         this.player.attack(targets[0].enemy.x, targets[0].enemy.y);
                         soundManager.playSFX('shoot', CONFIG.ENGINE.NORMAL_SHOT.SFX_VOL);
                         this.spawnHitParticles(this.player.x, this.player.y, CONFIG.COLORS.BULLET, CONFIG.ENGINE.NORMAL_SHOT.MUZZLE_PARTICLES);
@@ -533,6 +659,7 @@ export class BaseEngine {
                             b.damageOverride = this.player.getCurrentDamage();
                             b.pierceRemaining = Math.max(0, (this.player.extraPierce || 0) + (this.player.lichAscendanceActive?.pierce || 0));
                             b.splashRadius = (this.player.extraSplashRadius || 0) + (this.player.lichAscendanceActive?.splashRadius || 0);
+                            b.style = this.player.characterId === 3 ? 'fireball' : 'default';
                             this.bullets.push(b);
                         });
                     }, i * CONFIG.ENGINE.NORMAL_SHOT.MULTI_DELAY_MS);
@@ -595,17 +722,22 @@ export class BaseEngine {
 
     queueMeteorRain(cfg) {
         const now = Date.now();
-        const aliveEnemies = this.enemies.filter((e) => !e.isDead);
-        if (!aliveEnemies.length) return;
+        const viewW = this.canvas.width / this.zoom;
+        const viewH = this.canvas.height / this.zoom;
+        const visibleEnemies = this.enemies.filter((e) =>
+            !e.isDead
+            && e.x >= this.camera.x
+            && e.x <= this.camera.x + viewW
+            && e.y >= this.camera.y
+            && e.y <= this.camera.y + viewH
+        );
+        if (!visibleEnemies.length) return;
         this.player.meteorStrikes = [];
-        for (let i = 0; i < cfg.count; i++) {
-            const target = aliveEnemies[Math.floor(Math.random() * aliveEnemies.length)];
-            const spread = cfg.radius * 0.6;
-            const tx = target.x + (Math.random() - 0.5) * spread;
-            const ty = target.y + (Math.random() - 0.5) * spread;
+        for (let i = 0; i < visibleEnemies.length; i++) {
+            const target = visibleEnemies[i];
             this.player.meteorStrikes.push({
-                x: tx,
-                y: ty,
+                x: target.x,
+                y: target.y,
                 radius: cfg.radius,
                 damage: cfg.damage,
                 impactAt: now + cfg.impactDelay + (i * cfg.stagger),

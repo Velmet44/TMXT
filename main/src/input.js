@@ -1,5 +1,4 @@
 import { CONFIG } from './config.js';
-import { soundManager } from './SoundManager.js';
 
 export const keys = {
     w: false,
@@ -245,10 +244,12 @@ const dashBtn = document.getElementById('btn-dash');
 if (dashBtn) {
     dashBtn.addEventListener('touchstart', (e) => {
         e.preventDefault();
-        if (!keys.shift) soundManager.playSFX('dash');
         keys.shift = true;
     }, { passive: false });
     dashBtn.addEventListener('touchend', (e) => {
+        keys.shift = false;
+    });
+    dashBtn.addEventListener('touchcancel', () => {
         keys.shift = false;
     });
 }
@@ -262,6 +263,9 @@ abilityKeys.forEach((key, index) => {
             keys[key] = true;
         }, { passive: false });
         btn.addEventListener('touchend', (e) => {
+            keys[key] = false;
+        });
+        btn.addEventListener('touchcancel', () => {
             keys[key] = false;
         });
     }

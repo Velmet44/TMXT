@@ -79,19 +79,41 @@ export class Bullet {
             ctx.lineTo(CONFIG.BULLET.ENEMY_ARROW.WING_X, CONFIG.BULLET.ENEMY_ARROW.WING_Y);
             ctx.fill();
         } else {
-            // Futuristic Energy Bolt
-            const color = CONFIG.COLORS.BULLET;
-            const pulse = Math.sin(this.frame) * CONFIG.BULLET.PLAYER_VISUAL.PULSE_AMPLITUDE;
-            
-            // Outer glow trail
-            ctx.globalAlpha = CONFIG.BULLET.PLAYER_VISUAL.OUTER_ALPHA;
-            ctx.fillStyle = color;
-            ctx.fillRect(-this.size * CONFIG.BULLET.PLAYER_VISUAL.OUTER_LEN_MULT, -this.size - pulse/2, this.size * CONFIG.BULLET.PLAYER_VISUAL.OUTER_WIDTH_MULT, (this.size + pulse) * 2);
-            
-            // Inner core
-            ctx.globalAlpha = 1.0;
-            ctx.fillStyle = '#fff';
-            ctx.fillRect(-this.size, -this.size / 2, this.size * CONFIG.BULLET.PLAYER_VISUAL.CORE_LEN_MULT, this.size);
+            if (this.style === 'fireball') {
+                const pulse = Math.sin(this.frame * 1.4) * 1.8;
+                const r = this.size * 1.25 + pulse;
+                const grad = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r * 1.6);
+                grad.addColorStop(0, '#fff8c6');
+                grad.addColorStop(0.4, '#ff9f43');
+                grad.addColorStop(0.75, '#e74c3c');
+                grad.addColorStop(1, 'rgba(231, 76, 60, 0)');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(0, 0, r * 1.4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#ff6b2d';
+                ctx.beginPath();
+                ctx.arc(0, 0, r, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#ffeaa7';
+                ctx.beginPath();
+                ctx.arc(-r * 0.25, -r * 0.25, r * 0.38, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                // Futuristic Energy Bolt
+                const color = CONFIG.COLORS.BULLET;
+                const pulse = Math.sin(this.frame) * CONFIG.BULLET.PLAYER_VISUAL.PULSE_AMPLITUDE;
+                
+                // Outer glow trail
+                ctx.globalAlpha = CONFIG.BULLET.PLAYER_VISUAL.OUTER_ALPHA;
+                ctx.fillStyle = color;
+                ctx.fillRect(-this.size * CONFIG.BULLET.PLAYER_VISUAL.OUTER_LEN_MULT, -this.size - pulse/2, this.size * CONFIG.BULLET.PLAYER_VISUAL.OUTER_WIDTH_MULT, (this.size + pulse) * 2);
+                
+                // Inner core
+                ctx.globalAlpha = 1.0;
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(-this.size, -this.size / 2, this.size * CONFIG.BULLET.PLAYER_VISUAL.CORE_LEN_MULT, this.size);
+            }
         }
 
         ctx.restore();

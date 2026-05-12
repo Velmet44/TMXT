@@ -9,30 +9,28 @@ const castAbility = (slot, player, cfg) => {
     if (slot === 1) {
         const dirX = Math.cos(player.rotation || 0);
         const dirY = Math.sin(player.rotation || 0);
-        const distance = cfg.DISTANCE || 200;
-        const startX = player.x;
-        const startY = player.y;
+        const distance = cfg.DISTANCE || 220;
         player.x += dirX * distance;
         player.y += dirY * distance;
-        player.graveTrailActive = {
-            x: (startX + player.x) / 2,
-            y: (startY + player.y) / 2,
-            radius: Math.max(cfg.TRAIL_RADIUS || 48, distance * 0.28),
-            damage: cfg.TRAIL_DAMAGE || 50,
-            endTime: Date.now() + (cfg.TRAIL_DURATION || 1600),
-            lastTick: 0
+        player.pendingShadowBlink = {
+            x: player.x,
+            y: player.y,
+            radius: cfg.EXPLOSION_RADIUS || 260,
+            damage: cfg.DAMAGE || 320
         };
         if (!soundManager.playSFX('dash', 0.05)) soundManager.playSynth('necro');
         return true;
     }
     if (slot === 2) {
+        const worldScreenRadius = Math.max(window.innerWidth, window.innerHeight) * 1.5;
         player.soulVortexActive = {
             center: { x: player.x, y: player.y },
             endTime: Date.now() + (cfg.DURATION || 3000),
-            radius: cfg.RADIUS || 220,
+            radius: Math.max(cfg.RADIUS || 220, worldScreenRadius),
             pull: cfg.PULL || 1.8,
             damage: cfg.DAMAGE || 99999,
-            lastTick: 0
+            lastTick: 0,
+            fullScreen: true
         };
         if (!soundManager.playSFX('magnet', 0.06)) soundManager.playSynth('necro');
         return true;
@@ -63,17 +61,14 @@ const castAbility = (slot, player, cfg) => {
 };
 
 const isAbilityActive = (slot, player) => {
-    if (slot === 1) return !!player.graveTrailActive;
+    if (slot === 1) return false;
     if (slot === 2) return !!player.soulVortexActive;
     if (slot === 4) return !!player.lichAscendanceActive;
     return false;
 };
 
 const getAbilityHudState = (slot, player, cfg, now) => {
-    if (slot === 1 && player.graveTrailActive) {
-        const dur = cfg.TRAIL_DURATION || 1;
-        return { active: true, remaining: Math.max(0, (player.graveTrailActive.endTime - now) / dur) };
-    }
+    if (slot === 1) return { active: false, remaining: 0 };
     if (slot === 2 && player.soulVortexActive) {
         const dur = cfg.DURATION || 1;
         return { active: true, remaining: Math.max(0, (player.soulVortexActive.endTime - now) / dur) };

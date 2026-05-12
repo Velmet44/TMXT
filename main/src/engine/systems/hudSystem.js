@@ -24,11 +24,11 @@ export const updateStatsGridSystem = (engine, containerId) => {
         { label: 'HP', value: `${Math.ceil(p.hp)} / ${p.maxHp}` },
         { label: 'Damage', value: Math.round(p.getCurrentDamage()) },
         { label: 'Atk Speed', value: (CONFIG.ENGINE.STATS.ATK_SPEED_FACTOR / p.getCurrentAtkCooldown()).toFixed(1) + '/s' },
-        { label: 'Targets', value: p.projCount },
+        { label: 'Targets', value: p.getCurrentProjCount() },
         { label: 'Move Speed', value: p.getCurrentSpeed().toFixed(1) },
         { label: 'Regen', value: p.regen.toFixed(3) + '/s' },
         { label: 'E-Regen', value: (p.energyRegenMult * 100).toFixed(0) + '%' },
-        { label: 'Lifesteal', value: (p.lifesteal * 100).toFixed(0) + '%' },
+        { label: 'Lifesteal', value: (p.getCurrentLifesteal() * 100).toFixed(0) + '%' },
         { label: 'Crit Chance', value: ((p.critChance || 0) * 100).toFixed(0) + '%' },
         { label: 'Armor', value: ((p.armor || 0) * 100).toFixed(0) + '%' }
     ];
